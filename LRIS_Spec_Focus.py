@@ -1,6 +1,6 @@
 import sys,os,glob
 import subprocess
-from PyQt5.QtWidgets import QLabel,QHBoxLayout,QLineEdit,QPushButton,QVBoxLayout,QApplication,QAction,qApp,QWidget, QTextEdit, QGridLayout
+from PyQt5.QtWidgets import QLabel,QHBoxLayout,QLineEdit,QPushButton,QVBoxLayout,QApplication,QtCore,qQWidget, QTextEdit, QGridLayout
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
@@ -79,6 +79,16 @@ class MyWindow(QWidget):
         self.analyze_red.clicked.connect(self.analyzeFocus)
         self.output = QTextEdit()
 
+        # create process calls
+        self.redimages = QtCore.QProcess(self)
+        self.bluimages = QtCore.QProcess(self)
+        self.redimages.readyRead.connect(self.dataReady)
+        self.bluimages.readyRead.connect(self.dataReady)
+        self.redimages.started.connect(lambda: self.expose_red.setEnabled(False))
+        self.redimages.started.finished(lambda: self.expose_red.setEnabled(True))
+        self.bluimages.started.connect(lambda: self.expose_blu.setEnabled(False))
+        self.bluimages.started.finished(lambda: self.expose_blu.setEnabled(True))
+
         self.vlayout1 = QVBoxLayout()
         self.vlayout1.addLayout(self.grid)
         self.vlayout1.addStretch(1)
@@ -96,14 +106,15 @@ class MyWindow(QWidget):
         self.layout.addWidget(self.canvas)
 
         self.setLayout(self.layout)
-        #self.plot()
 
+    def dataReady(self):
+        cursor = self.output.textCursor()
+        cursor.movePosition(cursor.End)
+        cursor.insertText(str(self.process.readAll()))
+        self.output.ensureCursorVisible()
 
     def plot(self):
-        #data = [random.random() for i in range(10)]
-        #ax = self.figure.add_subplot(111)
-        ##ax.hold(False)
-        #ax.plot(data, '*-')
+
         plt.clf()
 
         """
@@ -178,50 +189,22 @@ class MyWindow(QWidget):
         self.run_command('modify -s lriscal deuteri=off')
         self.run_command('modify -s lriscal halogen=off')
 
+
+    def takeRedImages(self):
+        center = self.center_red.text()
+        step = self.step_red.text()
+        number = self.number_red.text()
+        startingPoint = float(center) - (float(step) * int(number) / 2)
+        self.redimages.start('ssh',['lriseng@lrisserver','focusloop','red',startingPoint,number,step])
+
     def takeBlueImages(self):
         center = self.center_blu.text()
         step = self.step_blu.text()
         number = self.number_blu.text()
-        startingPoint = float(center)-(float(step)*int(number)/2)
-        command = "ssh lriseng@lrisserver focusloop blue %s %s %s" % (startingPoint,number,step)
-        self.output.setText("Blue side running....")
-        self.run_command(command)
-
-    def takeRedImages(self):
-        self.run_command('modify -s lris outfile=rfoc_')
-        center = self.center_red.text()
-        step = self.step_red.text()
-        number = self.number_red.text()
-        startingPoint = float(center)-(float(step)*int(number)/2)
-        command = "ssh lriseng@lrisserver focusloop red %s %s %s" % (startingPoint,number,step)
-        self.output.setText("Red side running....")
-        self.run_command(command)
+        startingPoint = float(center) - (float(step) * int(number) / 2)
+        self.bluimages.start('ssh',['lriseng@lrisserver','focusloop','blue',startingPoint,number,step])
 
 
-    def run_command(self, command):
-        #try:
-        #    kroot = os.environ['KROOT']
-        #except:
-        #    kroot = ''
-        #cmdline = os.path.join(kroot, 'bin', command)
-        cmdline = command
-        if self.runMode is 'debug':
-            self.output.setText('Simulation mode\n Running:\n %s' % (cmdline))
-            return '', ''
-        try:
-            p = subprocess.Popen(cmdline, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-            output, errors = p.communicate()
-        except RuntimeError:
-            output = ''
-            errors = 'Cannot execute command %s' % command
-        except FileNotFoundError:
-            output = ''
-            errors = 'The command does not exist'
-        self.output.setText(str(output))
-        if errors:
-            self.output.setText(str(errors))
-
-        return output, errors
 
 if __name__ == "__main__":
     main()
