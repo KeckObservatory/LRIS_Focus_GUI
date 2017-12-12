@@ -76,6 +76,7 @@ class MyWindow(QWidget):
         self.analyze_red = QPushButton("Measure red focus")
         self.analyze_blu = QPushButton("Measure blue focus")
         self.analyze_blu.clicked.connect(self.analyzeFocus)
+        self.analyze_red.clicked.connect(self.analyzeFocus)
         self.output = QTextEdit()
 
         self.vlayout1 = QVBoxLayout()
@@ -103,6 +104,7 @@ class MyWindow(QWidget):
         #ax = self.figure.add_subplot(111)
         ##ax.hold(False)
         #ax.plot(data, '*-')
+        plt.clf()
 
         """
         Plots the (focus, std) pairs
@@ -141,20 +143,21 @@ class MyWindow(QWidget):
 
     def analyzeFocus(self):
         # how many images do I look for:
-        numberOfImages = int(self.number_blu.text())
-        sender = self.sender()
+        sender = self.sender().text()
+        print("The sender is %s" % (str(sender)))
         if sender == 'Measure red focus':
             prefix = 'rfoc*.fits'
-            numberToAnalyze = self.number_red.text()
+            numberToAnalyze = int(self.number_red.text())
         elif sender == 'Measure blue focus':
             prefix = 'bfoc*.fits'
-            numberToAnalyze = self.number_blu.text()
+            numberToAnalyze = int(self.number_blu.text())
 
         output, errors = self.run_command('ssh lriseng@lrisserver outdir')
         directory = str(output.decode()).replace('\n','')
         #directory = '/s/sdata243/lriseng/2017dec10'
         self.files = glob.glob(os.path.join(directory,prefix))
-        self.files.sort(key=os.path.getmtime)[-numberOfImages:]
+        self.files.sort(key=os.path.getmtime)
+        self.files = self.files[-numberToAnalyze:]
         print(self.files)
         if len(self.files) > 0:
             self.out = SpecFocus.measureWidths(self.files)
@@ -179,16 +182,19 @@ class MyWindow(QWidget):
         center = self.center_blu.text()
         step = self.step_blu.text()
         number = self.number_blu.text()
-        startingPoint = center-(step*int(number/2))
+        startingPoint = float(center)-(float(step)*int(number)/2)
         command = "ssh lriseng@lrisserver focusloop blue %s %s %s" % (startingPoint,number,step)
+        self.output.setText("Blue side running....")
         self.run_command(command)
 
     def takeRedImages(self):
+        self.run_command('modify -s lris outfile=rfoc_')
         center = self.center_red.text()
         step = self.step_red.text()
         number = self.number_red.text()
-        startingPoint = center-(step*int(number/2))
+        startingPoint = float(center)-(float(step)*int(number)/2)
         command = "ssh lriseng@lrisserver focusloop red %s %s %s" % (startingPoint,number,step)
+        self.output.setText("Red side running....")
         self.run_command(command)
 
 
