@@ -1,6 +1,7 @@
 import sys,os,glob
 import subprocess
-from PyQt5.QtWidgets import QLabel,QHBoxLayout,QLineEdit,QPushButton,QVBoxLayout,QApplication,QtCore,qQWidget, QTextEdit, QGridLayout
+from PyQt5.QtWidgets import QLabel,QHBoxLayout,QLineEdit,QPushButton,QVBoxLayout,QApplication,QWidget, QTextEdit, QGridLayout
+from PyQt5 import QtCore
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
@@ -23,6 +24,7 @@ class MyWindow(QWidget):
         self.runMode = 'normal'
         #self.runMode = 'debug'
         self.init_ui()
+        self.storeOriginalPrefix()
 
     def init_ui(self):
         # create objects
@@ -85,10 +87,12 @@ class MyWindow(QWidget):
         self.redimages.readyRead.connect(self.dataReady)
         self.bluimages.readyRead.connect(self.dataReady)
         self.redimages.started.connect(lambda: self.expose_red.setEnabled(False))
-        self.redimages.started.finished(lambda: self.expose_red.setEnabled(True))
+        self.redimages.finished.connect(lambda: self.expose_red.setEnabled(True))
         self.bluimages.started.connect(lambda: self.expose_blu.setEnabled(False))
-        self.bluimages.started.finished(lambda: self.expose_blu.setEnabled(True))
+        self.bluimages.finished.connect(lambda: self.expose_blu.setEnabled(True))
 
+        self.qbtn = QPushButton("Done and Quit")
+        self.qbtn.clicked.connect(self.allDone)
         self.vlayout1 = QVBoxLayout()
         self.vlayout1.addLayout(self.grid)
         self.vlayout1.addStretch(1)
@@ -97,6 +101,7 @@ class MyWindow(QWidget):
         self.vlayout1.addWidget(self.expose_blu)
         self.vlayout1.addWidget(self.analyze_red)
         self.vlayout1.addWidget(self.analyze_blu)
+        self.vlayout1.addWidget(self.qbtn)
         self.vlayout1.addWidget(self.output)
 
         self.figure = plt.figure(figsize=(10, 5))
@@ -106,11 +111,23 @@ class MyWindow(QWidget):
         self.layout.addWidget(self.canvas)
 
         self.setLayout(self.layout)
+    
+    def allDone(self):
+        self.run_command('modify -s lris ccdspeed=normal')
+        self.restoreOriginalPrefix()
+        self.close()
 
     def dataReady(self):
         cursor = self.output.textCursor()
         cursor.movePosition(cursor.End)
-        cursor.insertText(str(self.process.readAll()))
+        cursor.insertText(str(self.redimages.readAll(),'utf-8'))
+        cursor.insertText(str(self.bluimages.readAll(),'utf-8'))
+        self.output.ensureCursorVisible()
+
+    def showOutput(self, text):
+        cursor = self.output.textCursor()
+        cursor.movePosition(cursor.End)
+        cursor.insertText(text)
         self.output.ensureCursorVisible()
 
     def plot(self):
@@ -148,6 +165,7 @@ class MyWindow(QWidget):
         plt.plot((x0, self.minX), (negAsymp(x0), negAsymp(self.minX)), 'g-')
         plt.plot((self.minX, x1), (posAsymp(self.minX), posAsymp(x1)), 'g-')
         plt.grid()
+        plt.title("Focus: %.2f" % (float(self.minX)))
 
         self.canvas.draw()
 
@@ -165,17 +183,18 @@ class MyWindow(QWidget):
 
         output, errors = self.run_command('ssh lriseng@lrisserver outdir')
         directory = str(output.decode()).replace('\n','')
-        #directory = '/s/sdata243/lriseng/2017dec10'
+
         self.files = glob.glob(os.path.join(directory,prefix))
         self.files.sort(key=os.path.getmtime)
         self.files = self.files[-numberToAnalyze:]
-        print(self.files)
+        self.showOutput("Files to be analyzed: %s \n" % (str(self.files)))
         if len(self.files) > 0:
             self.out = SpecFocus.measureWidths(self.files)
             print(self.out)
             self.pairs = SpecFocus.generatePairs(self.out)
             self.funcV, self.m0, self.b0, self.minX = SpecFocus.fitPairs(self.pairs)
             self.plot()
+            self.showOutput("\nThe Focus is %.2f" % (float(self.minX)))
         else:
             print("No files to examine in directory [%s]" % (directory))
 
@@ -189,21 +208,60 @@ class MyWindow(QWidget):
         self.run_command('modify -s lriscal deuteri=off')
         self.run_command('modify -s lriscal halogen=off')
 
+    def storeOriginalPrefix(self):
+        output, errors = self.run_command('show -s lris -terse outfile')
+        self.originalPrefixRed = str(output.decode()).replace('\n','')
+        output, errors = self.run_command('show -s lrisblue -terse outfile')
+        self.originalPrefixBlu = str(output.decode()).replace('\n','')
+        self.run_command('modify -s lris ccdspeed=fast')
+        
+    def restoreOriginalPrefix(self):
+        self.run_command('modify -s lris outfile=%s' % self.originalPrefixRed)
+        self.run_command('modify -s lrisblue outfile=%s' % self.originalPrefixBlu)
 
     def takeRedImages(self):
+        output,errors = self.run_command('modify -s lris outfile=rfoc_')
         center = self.center_red.text()
         step = self.step_red.text()
         number = self.number_red.text()
-        startingPoint = float(center) - (float(step) * int(number) / 2)
+        startingPoint = str(float(center) - (float(step) * int(number) / 2))
         self.redimages.start('ssh',['lriseng@lrisserver','focusloop','red',startingPoint,number,step])
 
     def takeBlueImages(self):
+        output,errors = self.run_command('modify -s lrisblue outfile=bfoc_')
         center = self.center_blu.text()
         step = self.step_blu.text()
         number = self.number_blu.text()
-        startingPoint = float(center) - (float(step) * int(number) / 2)
+        startingPoint = str(float(center) - (float(step) * int(number) / 2))
         self.bluimages.start('ssh',['lriseng@lrisserver','focusloop','blue',startingPoint,number,step])
 
+    def run_command(self, command):
+        #try:
+        #    kroot = os.environ['KROOT']
+        #except:
+        #    kroot = ''
+        #cmdline = os.path.join(kroot, 'bin', command)
+        cmdline = command
+        if self.runMode is 'debug':
+            self.output.setText('Simulation mode\n Running:\n %s' % (cmdline))
+            return '', ''
+        try:
+            p = subprocess.Popen(cmdline, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True
+)
+            output, errors = p.communicate()
+        except RuntimeError:
+            output = ''
+            errors = 'Cannot execute command %s' % command
+        except FileNotFoundError:
+            output = ''
+            errors = 'The command does not exist'
+        #self.output.setText(str(output))
+        if len(errors)>0:
+            output = output+errors
+        self.showOutput(str(output.decode()).replace('\n',''))
+        self.showOutput('\n')
+
+        return output, errors
 
 
 if __name__ == "__main__":
