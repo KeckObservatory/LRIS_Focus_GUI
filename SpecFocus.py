@@ -73,7 +73,10 @@ def findWidths (arr1d, size=60):
     """
     out = []
     for x in range(0, len(arr1d)-size, size):
-        ok, cen, std, idx = centroidLoop(arr1d, x, x+size)     
+        try:
+            ok, cen, std, idx = centroidLoop(arr1d, x, x+size)     
+        except:
+            pass
         #print (res)
         if ok == 0:
             out.append(std)
