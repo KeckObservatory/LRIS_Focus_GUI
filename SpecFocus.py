@@ -151,14 +151,22 @@ def measureWidths(files):
         for row in range(minrow,maxrow,100):
             cut1d = img[:,row]
             if np.max(gaussian_filter(cut1d,sigma=20))> 2000:
-                widths = findWidths(cut1d)
+                widths = np.array(findWidths(cut1d))
                 if len(widths)>5:
-                    clippedWidths,low,upp = stats.sigmaclip(widths,low=4,high=2)
-                    if clippedWidths.std()<1:
-                        print(row,Focus,clippedWidths.mean(),low,upp,clippedWidths.std())
+                    #clippedWidths,low,upp = stats.sigmaclip(widths,low=4,high=2)
+                    clippedWidths = absoluteClip(widths, high=1)
+                    if clippedWidths.std()<1 and np.median(clippedWidths)<5:
+                        #print(row,Focus,clippedWidths.mean(),low,upp,clippedWidths.std())
                         out.append((Focus, clippedWidths))
     return out
 
+
+def absoluteClip(widths, high):
+    print(widths)
+    median = np.median(widths)
+    print(median)
+    print(median+high)
+    return widths[np.where(widths<median+high)]
 
 
 def generatePairs(out):
