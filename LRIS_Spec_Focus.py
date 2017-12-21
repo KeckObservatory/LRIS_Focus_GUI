@@ -24,7 +24,7 @@ class MyWindow(QWidget):
         self.runMode = 'normal'
         #self.runMode = 'debug'
         self.init_ui()
-        self.storeOriginalPrefix()
+        #self.storeOriginalPrefix()
 
     def init_ui(self):
         # create objects
@@ -209,18 +209,19 @@ class MyWindow(QWidget):
         self.run_command('modify -s lriscal halogen=off')
 
     def storeOriginalPrefix(self):
-        output, errors = self.run_command('show -s lris -terse outfile')
-        self.originalPrefixRed = str(output.decode()).replace('\n','')
-        output, errors = self.run_command('show -s lrisblue -terse outfile')
-        self.originalPrefixBlu = str(output.decode()).replace('\n','')
-        self.run_command('modify -s lris ccdspeed=fast')
+        pass
+
         
     def restoreOriginalPrefix(self):
         self.run_command('modify -s lris outfile=%s' % self.originalPrefixRed)
         self.run_command('modify -s lrisblue outfile=%s' % self.originalPrefixBlu)
 
     def takeRedImages(self):
-        output,errors = self.run_command('modify -s lris outfile=rfoc_')
+        output, errors = self.run_command('show -s lris -terse outfile')
+        self.originalPrefixRed = str(output.decode()).replace('\n','')
+        output, errors = self.run_command('modify -s lris outfile=rfoc_')
+        output, errors = self.run_command('fullnorm1x1')
+        output, errors = self.run_command('tintr 1')
         center = self.center_red.text()
         step = self.step_red.text()
         number = self.number_red.text()
@@ -228,7 +229,12 @@ class MyWindow(QWidget):
         self.redimages.start('ssh',['lriseng@lrisserver','focusloop','red',startingPoint,number,step])
 
     def takeBlueImages(self):
-        output,errors = self.run_command('modify -s lrisblue outfile=bfoc_')
+        output, errors = self.run_command('show -s lrisblue -terse outfile')
+        self.originalPrefixBlu = str(output.decode()).replace('\n','')
+        output, errors = self.run_command('modify -s lrisblue outfile=bfoc_')
+        output, errors = self.run_command('fullframeb')
+        output, errors = self.run_command('tintb 1')
+        output, errors = self.run_command('modify -s lris ccdspeed=fast')
         center = self.center_blu.text()
         step = self.step_blu.text()
         number = self.number_blu.text()
