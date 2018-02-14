@@ -147,7 +147,16 @@ class MyWindow(QWidget):
         """
         Plots the (focus, std) pairs
         """
-        plt.plot(self.pairs[0], self.pairs[1], 'o')
+
+        uniqueX = set[self.pairs[0]]
+        uniqueY = []
+        for point in uniqueX:
+            selectedPoints = self.pairs[1][(self.pairs[0] == point)]
+            averagePoint = np.median(selectedPoints)
+            np.append(uniqueY, averagePoint)
+
+        #plt.plot(self.pairs[0], self.pairs[1], 'o')
+        plt.plot(uniqueX, uniqueY, 'o')
         padding = 10  # this means 10% of the range will be added to each side of the plot
 
         plotRange = max(self.pairs[0]) - min(self.pairs[0])
