@@ -52,7 +52,7 @@ class MyWindow(QWidget):
         self.number_red.setText("7")
 
         self.center_blu = QLineEdit()
-        self.center_blu.setText("-3450")
+        self.center_blu.setText("-3550")
         self.step_blu = QLineEdit()
         self.step_blu.setText("90")
         self.number_blu = QLineEdit()
