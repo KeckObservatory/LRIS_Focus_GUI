@@ -148,14 +148,20 @@ class MyWindow(QWidget):
         Plots the (focus, std) pairs
         """
 
-        uniqueX = set[self.pairs[0]]
+        xpoints = set(self.pairs[0])
+        print(xpoints)
+        uniqueX = []
         uniqueY = []
-        for point in uniqueX:
+        for point in xpoints:
+            print(point)
             selectedPoints = self.pairs[1][(self.pairs[0] == point)]
             averagePoint = np.median(selectedPoints)
-            np.append(uniqueY, averagePoint)
+            uniqueY= np.append(uniqueY, averagePoint)
+            uniqueX= np.append(uniqueX, point)
 
         #plt.plot(self.pairs[0], self.pairs[1], 'o')
+        print(uniqueX)
+        print(uniqueY)
         plt.plot(uniqueX, uniqueY, 'o')
         padding = 10  # this means 10% of the range will be added to each side of the plot
 
@@ -234,6 +240,8 @@ class MyWindow(QWidget):
         output, errors = self.run_command('modify -s lris outfile=rfoc_')
         output, errors = self.run_command('fullnorm1x1')
         output, errors = self.run_command('tintr 1')
+        output, errors = self.run_command('modify -s lris ccdspeed=fast')
+
         center = self.center_red.text()
         step = self.step_red.text()
         number = self.number_red.text()
@@ -246,7 +254,6 @@ class MyWindow(QWidget):
         output, errors = self.run_command('modify -s lrisblue outfile=bfoc_')
         output, errors = self.run_command('fullframeb')
         output, errors = self.run_command('tintb 1')
-        output, errors = self.run_command('modify -s lris ccdspeed=fast')
         center = self.center_blu.text()
         step = self.step_blu.text()
         number = self.number_blu.text()
