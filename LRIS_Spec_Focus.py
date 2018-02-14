@@ -1,14 +1,18 @@
-import sys,os,glob
+import glob
+import os
+import random
 import subprocess
-from PyQt5.QtWidgets import QLabel,QHBoxLayout,QLineEdit,QPushButton,QVBoxLayout,QApplication,QWidget, QTextEdit, QGridLayout
+import sys
+
+import matplotlib.pyplot as plt
+import numpy as np
 from PyQt5 import QtCore
+from PyQt5.QtWidgets import QLabel, QHBoxLayout, QLineEdit, QPushButton, QVBoxLayout, QApplication, QWidget, QTextEdit, \
+    QGridLayout
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
-import random
-import numpy as np
-import SpecFocus
 
+import SpecFocus
 
 
 def main():
@@ -24,7 +28,6 @@ class MyWindow(QWidget):
         self.runMode = 'normal'
         #self.runMode = 'debug'
         self.init_ui()
-        #self.storeOriginalPrefix()
 
     def init_ui(self):
         # create objects
@@ -67,8 +70,6 @@ class MyWindow(QWidget):
         self.grid.addWidget(self.step_blu, 2, 2)
         self.grid.addWidget(self.number_blu, 2, 3)
 
-        # defaults
-
 
         # analyze results
         self.expose_red = QPushButton("Take red focus images")
@@ -87,9 +88,9 @@ class MyWindow(QWidget):
         self.redimages.readyRead.connect(self.dataReady)
         self.bluimages.readyRead.connect(self.dataReady)
         self.redimages.started.connect(lambda: self.expose_red.setEnabled(False))
-        self.redimages.finished.connect(lambda: self.expose_red.setEnabled(True))
+        self.redimages.finished.connect(self.redSideDone)
         self.bluimages.started.connect(lambda: self.expose_blu.setEnabled(False))
-        self.bluimages.finished.connect(lambda: self.expose_blu.setEnabled(True))
+        self.bluimages.finished.connect(self.bluSideDone)
 
         self.qbtn = QPushButton("Done and Quit")
         self.qbtn.clicked.connect(self.allDone)
@@ -111,17 +112,26 @@ class MyWindow(QWidget):
         self.layout.addWidget(self.canvas)
 
         self.setLayout(self.layout)
-    
-    def allDone(self):
+
+
+    def redSideDone(self):
+        self.expose_red.setEnabled(True)
+        self.run_command('modify -s lris outfile=%s' % self.originalPrefixRed)
         self.run_command('modify -s lris ccdspeed=normal')
-        self.restoreOriginalPrefix()
+
+    def bluSideDone(self):
+        self.expose_blu.setEnabled(True)
+        self.run_command('modify -s lrisblue outfile=%s' % self.originalPrefixBlu)
+
+    def allDone(self):
+
         self.close()
 
     def dataReady(self):
         cursor = self.output.textCursor()
         cursor.movePosition(cursor.End)
-        cursor.insertText(str(self.redimages.readAll(),'utf-8'))
-        cursor.insertText(str(self.bluimages.readAll(),'utf-8'))
+        cursor.insertText(str(self.redimages.readAll(), 'utf-8'))
+        cursor.insertText(str(self.bluimages.readAll(), 'utf-8'))
         self.output.ensureCursorVisible()
 
     def showOutput(self, text):
@@ -182,9 +192,9 @@ class MyWindow(QWidget):
             numberToAnalyze = int(self.number_blu.text())
 
         output, errors = self.run_command('ssh lriseng@lrisserver outdir')
-        directory = str(output.decode()).replace('\n','')
+        directory = str(output.decode()).replace('\n', '')
 
-        self.files = glob.glob(os.path.join(directory,prefix))
+        self.files = glob.glob(os.path.join(directory, prefix))
         self.files.sort(key=os.path.getmtime)
         self.files = self.files[-numberToAnalyze:]
         self.showOutput("Files to be analyzed: %s \n" % (str(self.files)))
@@ -208,17 +218,10 @@ class MyWindow(QWidget):
         self.run_command('modify -s lriscal deuteri=off')
         self.run_command('modify -s lriscal halogen=off')
 
-    def storeOriginalPrefix(self):
-        pass
-
-        
-    def restoreOriginalPrefix(self):
-        self.run_command('modify -s lris outfile=%s' % self.originalPrefixRed)
-        self.run_command('modify -s lrisblue outfile=%s' % self.originalPrefixBlu)
 
     def takeRedImages(self):
         output, errors = self.run_command('show -s lris -terse outfile')
-        self.originalPrefixRed = str(output.decode()).replace('\n','')
+        self.originalPrefixRed = str(output.decode()).replace('\n', '')
         output, errors = self.run_command('modify -s lris outfile=rfoc_')
         output, errors = self.run_command('fullnorm1x1')
         output, errors = self.run_command('tintr 1')
@@ -226,11 +229,11 @@ class MyWindow(QWidget):
         step = self.step_red.text()
         number = self.number_red.text()
         startingPoint = str(float(center) - (float(step) * int(number) / 2))
-        self.redimages.start('ssh',['lriseng@lrisserver','focusloop','red',startingPoint,number,step])
+        self.redimages.start('ssh', ['lriseng@lrisserver', 'focusloop', 'red', startingPoint, number, step])
 
     def takeBlueImages(self):
         output, errors = self.run_command('show -s lrisblue -terse outfile')
-        self.originalPrefixBlu = str(output.decode()).replace('\n','')
+        self.originalPrefixBlu = str(output.decode()).replace('\n', '')
         output, errors = self.run_command('modify -s lrisblue outfile=bfoc_')
         output, errors = self.run_command('fullframeb')
         output, errors = self.run_command('tintb 1')
@@ -239,21 +242,15 @@ class MyWindow(QWidget):
         step = self.step_blu.text()
         number = self.number_blu.text()
         startingPoint = str(float(center) - (float(step) * int(number) / 2))
-        self.bluimages.start('ssh',['lriseng@lrisserver','focusloop','blue',startingPoint,number,step])
+        self.bluimages.start('ssh', ['lriseng@lrisserver', 'focusloop', 'blue', startingPoint, number, step])
 
     def run_command(self, command):
-        #try:
-        #    kroot = os.environ['KROOT']
-        #except:
-        #    kroot = ''
-        #cmdline = os.path.join(kroot, 'bin', command)
         cmdline = command
         if self.runMode is 'debug':
             self.output.setText('Simulation mode\n Running:\n %s' % (cmdline))
             return '', ''
         try:
-            p = subprocess.Popen(cmdline, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True
-)
+            p = subprocess.Popen(cmdline, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
             output, errors = p.communicate()
         except RuntimeError:
             output = ''
@@ -264,7 +261,7 @@ class MyWindow(QWidget):
         #self.output.setText(str(output))
         if len(errors)>0:
             output = output+errors
-        self.showOutput(str(output.decode()).replace('\n',''))
+        self.showOutput(str(output.decode()).replace('\n', ''))
         self.showOutput('\n')
 
         return output, errors
