@@ -72,6 +72,7 @@ class MyWindow(QWidget):
 
 
         # analyze self.expose_red = QPushButton("Take red focus images")
+        self.expose_red = QPushButton("Take red focus images")
         self.expose_red.clicked.connect(self.takeRedImages)
         self.expose_blu = QPushButton("Take blue focus images")
         self.expose_blu.clicked.connect(self.takeBlueImages)
@@ -261,6 +262,8 @@ class MyWindow(QWidget):
     def bluSideDone(self):
         self.expose_blu.setEnabled(True)
         self.run_command('modify -s lrisblue outfile=%s' % self.originalPrefixBlu)
+        self.run_command('fullframeb')
+        self.run_command('modify -s lrisblue window=1,0,0,1024,2048')
         self.run_command('modify -s lrisblue binning=%s' % (self.binningBlu))
 
     def takeRedImages(self):
