@@ -71,8 +71,7 @@ class MyWindow(QWidget):
         self.grid.addWidget(self.number_blu, 2, 3)
 
 
-        # analyze results
-        self.expose_red = QPushButton("Take red focus images")
+        # analyze self.expose_red = QPushButton("Take red focus images")
         self.expose_red.clicked.connect(self.takeRedImages)
         self.expose_blu = QPushButton("Take blue focus images")
         self.expose_blu.clicked.connect(self.takeBlueImages)
@@ -114,14 +113,7 @@ class MyWindow(QWidget):
         self.setLayout(self.layout)
 
 
-    def redSideDone(self):
-        self.expose_red.setEnabled(True)
-        self.run_command('modify -s lris outfile=%s' % self.originalPrefixRed)
-        self.run_command('modify -s lris ccdspeed=normal')
 
-    def bluSideDone(self):
-        self.expose_blu.setEnabled(True)
-        self.run_command('modify -s lrisblue outfile=%s' % self.originalPrefixBlu)
 
     def allDone(self):
 
@@ -234,9 +226,45 @@ class MyWindow(QWidget):
         self.run_command('modify -s lriscal halogen=off')
 
 
-    def takeRedImages(self):
+    def saveRedState(self):
         output, errors = self.run_command('show -s lris -terse outfile')
         self.originalPrefixRed = str(output.decode()).replace('\n', '')
+        output, errors = self.run_command('show -s lris -terse binning')
+        for element in output.decode().replace('\t','').split('\n'):
+            keyword = element.split(' ')[0]
+            if keyword == 'Xbinning':
+                binningx = element.split(' ')[1]
+            if keyword == 'Ybinning':
+                binningy = element.split(' ')[1]
+
+        self.binningRed = '%s,%s' % (binningx, binningy)
+
+    def saveBluState(self):
+        output, errors = self.run_command('show -s lrisblue -terse outfile')
+        self.originalPrefixBlu = str(output.decode()).replace('\n', '')
+        output, errors = self.run_command('show -s lrisblue -terse binning')
+        for element in output.decode().replace('\t', '').split('\n'):
+            keyword = element.split(' ')[0]
+            if keyword == 'Xbinning':
+                binningx = element.split(' ')[1]
+            if keyword == 'Ybinning':
+                binningy = element.split(' ')[1]
+
+        self.binningBlu = '%s,%s' % (binningx, binningy)
+
+    def redSideDone(self):
+        self.expose_red.setEnabled(True)
+        self.run_command('modify -s lris outfile=%s' % self.originalPrefixRed)
+        self.run_command('modify -s lris ccdspeed=normal')
+        self.run_command('modify -s lris binning=%s' % (self.binningRed))
+
+    def bluSideDone(self):
+        self.expose_blu.setEnabled(True)
+        self.run_command('modify -s lrisblue outfile=%s' % self.originalPrefixBlu)
+        self.run_command('modify -s lrisblue binning=%s' % (self.binningBlu))
+
+    def takeRedImages(self):
+        self.saveRedState()
         output, errors = self.run_command('modify -s lris outfile=rfoc_')
         output, errors = self.run_command('fullnorm1x1')
         output, errors = self.run_command('tintr 1')
@@ -249,8 +277,7 @@ class MyWindow(QWidget):
         self.redimages.start('ssh', ['lriseng@lrisserver', 'focusloop', 'red', startingPoint, number, step])
 
     def takeBlueImages(self):
-        output, errors = self.run_command('show -s lrisblue -terse outfile')
-        self.originalPrefixBlu = str(output.decode()).replace('\n', '')
+        self.saveBluState()
         output, errors = self.run_command('modify -s lrisblue outfile=bfoc_')
         output, errors = self.run_command('fullframeb')
         output, errors = self.run_command('tintb 1')
