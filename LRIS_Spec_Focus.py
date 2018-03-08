@@ -233,38 +233,36 @@ class MyWindow(QWidget):
 
     def saveRedState(self):
         self.originalPrefixRed = self.lris['outfile'].read()
-        binningx,binningy = self.lris['binning'].read(binary=True)
-        self.binningRed = '%s,%s' % (binningx, binningy)
+        self.binningx_red,self.binningy_red = self.lris['binning'].read(binary=True)
+
 
     def saveBluState(self):
-        output, errors = self.run_command('show -s lrisblue -terse outfile')
         self.originalPrefixBlu = self.lrisblue['outfile'].read()
-        binningx,binningy = self.lris['binning'].read(binary=True)
-        self.binningBlu = '%s,%s' % (binningx, binningy)
+        self.binningx_blu,self.binningy_blu = self.lris['binning'].read(binary=True)
 
     def redSideDone(self):
         self.expose_red.setEnabled(True)
         self.lris['outfile'].write(self.originalPrefixRed)
         self.lris['ccdspeed'].write('normal')
-        self.lris['binning'].write(self.binningRed)
+        self.lris['binning'].write([self.binningx_red,self.binningy_red])
 
     def bluSideDone(self):
         self.expose_blu.setEnabled(True)
         self.lrisblue['outfile'].write(self.originalPrefixBlu)
         self.lrisblue['numamps'].write(4)
-        self.lrisblue['amplist'].write('1,4,0,0')
+        self.lrisblue['amplist'].write([1,4,0,0])
         self.lrisblue['ccdsel'].write('mosaic')
-        self.lrisblue['binning'].write('1,1')
-        self.lrisblue['window'].write('1,0,0,2048,4096')
+        self.lrisblue['binning'].write([1,1])
+        self.lrisblue['window'].write([1,0,0,2048,4096])
         self.lrisblue['prepix'].write(51)
         self.lrisblue['postpix'].write(80)
-        self.lrisblue['binning'].write(self.binningBlu)
+        self.lrisblue['binning'].write([self.binningx_blu,self.binningy_blu])
 
     def takeRedImages(self):
         self.saveRedState()
         self.lris['outfile'].write('rfoc_')
-        self.lris['binning'].write('1,1')
-        self.lris['pane'].write('0,0,4096,4096')
+        self.lris['binning'].write([1,1])
+        self.lris['pane'].write([0,0,4096,4096])
         self.lris['ttime'].write(1)
         self.lris['ccdspeed'].write('fast')
 
@@ -276,12 +274,12 @@ class MyWindow(QWidget):
 
     def takeBlueImages(self):
         self.saveBluState()
-        self.lrisblue['outfile']=('bfoc_')
+        self.lrisblue['outfile'].write('bfoc_')
         self.lrisblue['numamps'].write(4)
-        self.lrisblue['amplist'].write('1,4,0,0')
+        self.lrisblue['amplist'].write([1,4,0,0])
         self.lrisblue['ccdsel'].write('mosaic')
-        self.lrisblue['binning'].write('1,1')
-        self.lrisblue['window'].write('1,0,0,2048,4096')
+        self.lrisblue['binning'].write([1,1])
+        self.lrisblue['window'].write([1,0,0,2048,4096])
         self.lrisblue['prepix'].write(51)
         self.lrisblue['postpix'].write(80)
         self.lrisblue['ttime'].write(1)
