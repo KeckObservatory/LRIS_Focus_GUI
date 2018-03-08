@@ -231,14 +231,14 @@ class MyWindow(QWidget):
             self.lriscal['deuteri'].write('off')
             self.lriscal['halogen'].write('off')
         except:
-            self.run_command('modify -s lriscal neon=on')
-            self.run_command('modify -s lriscal argon=on')
-            self.run_command('modify -s lriscal mercury=on')
-            self.run_command('modify -s lriscal cadmium=on')
-            self.run_command('modify -s lriscal zinc=on')
-            self.run_command('modify -s lriscal feargon=off')
-            self.run_command('modify -s lriscal deuteri=off')
-            self.run_command('modify -s lriscal halogen=off')
+            self.run_command('ssh lriseng@lrisserver modify -s lriscal neon=on')
+            self.run_command('ssh lriseng@lrisserver modify -s lriscal argon=on')
+            self.run_command('ssh lriseng@lrisserver modify -s lriscal mercury=on')
+            self.run_command('ssh lriseng@lrisserver modify -s lriscal cadmium=on')
+            self.run_command('ssh lriseng@lrisserver modify -s lriscal zinc=on')
+            self.run_command('ssh lriseng@lrisserver modify -s lriscal feargon=off')
+            self.run_command('ssh lriseng@lrisserver modify -s lriscal deuteri=off')
+            self.run_command('ssh lriseng@lrisserver modify -s lriscal halogen=off')
 
 
     def saveRedState(self):
