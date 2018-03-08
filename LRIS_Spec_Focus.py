@@ -1,6 +1,6 @@
 import glob
 import os
-import random
+
 import subprocess
 import sys
 
@@ -12,7 +12,7 @@ from PyQt5 import QtCore
 from PyQt5.QtWidgets import QLabel, QHBoxLayout, QLineEdit, QPushButton, QVBoxLayout, QApplication, QWidget, QTextEdit, \
     QGridLayout
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
+
 
 import SpecFocus
 
@@ -221,52 +221,52 @@ class MyWindow(QWidget):
             print("No files to examine in directory [%s]" % (directory))
 
     def turnOnLamps(self):
-        lriscal = ktl.cache('lriscal')
-        lriscal['neon'].write('on')
-        lriscal['mercury'].write('on')
-        lriscal['cadmium'].write('on')
-        lriscal['zinc'].write('on')
-        lriscal['feargon'].write('off')
-        lriscal['deuteri'].write('off')
-        lriscal['halogen'].write('off')
+        self.lriscal = ktl.cache('self.lriscal')
+        self.lriscal['neon'].write('on')
+        self.lriscal['mercury'].write('on')
+        self.lriscal['cadmium'].write('on')
+        self.lriscal['zinc'].write('on')
+        self.lriscal['feargon'].write('off')
+        self.lriscal['deuteri'].write('off')
+        self.lriscal['halogen'].write('off')
 
 
     def saveRedState(self):
-        self.originalPrefixRed = lris['outfile'].read()
-        binningx,binningy = lris['binning'].read(binary=True)
+        self.originalPrefixRed = self.lris['outfile'].read()
+        binningx,binningy = self.lris['binning'].read(binary=True)
         self.binningRed = '%s,%s' % (binningx, binningy)
 
     def saveBluState(self):
         output, errors = self.run_command('show -s lrisblue -terse outfile')
-        self.originalPrefixBlu = lrisblue['outfile'].read()
-        binningx,binningy = lris['binning'].read(binary=True)
+        self.originalPrefixBlu = self.lrisblue['outfile'].read()
+        binningx,binningy = self.lris['binning'].read(binary=True)
         self.binningBlu = '%s,%s' % (binningx, binningy)
 
     def redSideDone(self):
         self.expose_red.setEnabled(True)
-        lris['outfile'].write(self.originalPrefixRed)
-        lris['ccdspeed'].write('normal')
-        lris['binning'].write(self.binningRed)
+        self.lris['outfile'].write(self.originalPrefixRed)
+        self.lris['ccdspeed'].write('normal')
+        self.lris['binning'].write(self.binningRed)
 
     def bluSideDone(self):
         self.expose_blu.setEnabled(True)
-        lrisblue['outfile'].write(self.originalPrefixBlu)
-        lrisblue['numamps'].write(4)
-        lrisblue['amplist'].write('1,4,0,0')
-        lrisblue['ccdsel'].write('mosaic')
-        lrisblue['binning'].write('1,1')
-        lrisblue['window'].write('1,0,0,2048,4096')
-        lrisblue['prepix'].write(51)
-        lrisblue['postpix'].write(80)
-        lrisblue['binning'].write(self.binningBlu)
+        self.lrisblue['outfile'].write(self.originalPrefixBlu)
+        self.lrisblue['numamps'].write(4)
+        self.lrisblue['amplist'].write('1,4,0,0')
+        self.lrisblue['ccdsel'].write('mosaic')
+        self.lrisblue['binning'].write('1,1')
+        self.lrisblue['window'].write('1,0,0,2048,4096')
+        self.lrisblue['prepix'].write(51)
+        self.lrisblue['postpix'].write(80)
+        self.lrisblue['binning'].write(self.binningBlu)
 
     def takeRedImages(self):
         self.saveRedState()
-        lris['outfile'].write('rfoc_')
-        lris['binning'].write('1,1')
-        lris['pane'].write('0,0,4096,4096')
-        lris['ttime'].write(1)
-        lris['ccdspeed'].write('fast')
+        self.lris['outfile'].write('rfoc_')
+        self.lris['binning'].write('1,1')
+        self.lris['pane'].write('0,0,4096,4096')
+        self.lris['ttime'].write(1)
+        self.lris['ccdspeed'].write('fast')
 
         center = self.center_red.text()
         step = self.step_red.text()
@@ -276,15 +276,15 @@ class MyWindow(QWidget):
 
     def takeBlueImages(self):
         self.saveBluState()
-        lrisblue['outfile']=('bfoc_')
-        lrisblue['numamps'].write(4)
-        lrisblue['amplist'].write('1,4,0,0')
-        lrisblue['ccdsel'].write('mosaic')
-        lrisblue['binning'].write('1,1')
-        lrisblue['window'].write('1,0,0,2048,4096')
-        lrisblue['prepix'].write(51)
-        lrisblue['postpix'].write(80)
-        lrisblue['ttime'].write(1)
+        self.lrisblue['outfile']=('bfoc_')
+        self.lrisblue['numamps'].write(4)
+        self.lrisblue['amplist'].write('1,4,0,0')
+        self.lrisblue['ccdsel'].write('mosaic')
+        self.lrisblue['binning'].write('1,1')
+        self.lrisblue['window'].write('1,0,0,2048,4096')
+        self.lrisblue['prepix'].write(51)
+        self.lrisblue['postpix'].write(80)
+        self.lrisblue['ttime'].write(1)
 
         center = self.center_blu.text()
         step = self.step_blu.text()
