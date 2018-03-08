@@ -4,6 +4,8 @@ import random
 import subprocess
 import sys
 
+import ktl
+
 import matplotlib.pyplot as plt
 import numpy as np
 from PyQt5 import QtCore
@@ -26,6 +28,8 @@ class MyWindow(QWidget):
     def __init__(self, *args):
         super().__init__()
         self.runMode = 'normal'
+        self.lris = ktl.cache('lris')
+        self.lrisblue = ktl.cache('lrisblue')
         #self.runMode = 'debug'
         self.init_ui()
 
@@ -217,61 +221,52 @@ class MyWindow(QWidget):
             print("No files to examine in directory [%s]" % (directory))
 
     def turnOnLamps(self):
-        self.run_command('modify -s lriscal neon=on')
-        self.run_command('modify -s lriscal argon=on')
-        self.run_command('modify -s lriscal mercury=on')
-        self.run_command('modify -s lriscal cadmium=on')
-        self.run_command('modify -s lriscal zinc=on')
-        self.run_command('modify -s lriscal feargon=off')
-        self.run_command('modify -s lriscal deuteri=off')
-        self.run_command('modify -s lriscal halogen=off')
+        lriscal = ktl.cache('lriscal')
+        lriscal['neon'].write('on')
+        lriscal['mercury'].write('on')
+        lriscal['cadmium'].write('on')
+        lriscal['zinc'].write('on')
+        lriscal['feargon'].write('off')
+        lriscal['deuteri'].write('off')
+        lriscal['halogen'].write('off')
 
 
     def saveRedState(self):
-        output, errors = self.run_command('show -s lris -terse outfile')
-        self.originalPrefixRed = str(output.decode()).replace('\n', '')
-        output, errors = self.run_command('show -s lris -terse binning')
-        for element in output.decode().replace('\t','').split('\n'):
-            keyword = element.split(' ')[0]
-            if keyword == 'Xbinning':
-                binningx = element.split(' ')[1]
-            if keyword == 'Ybinning':
-                binningy = element.split(' ')[1]
-
+        self.originalPrefixRed = lris['outfile'].read()
+        binningx,binningy = lris['binning'].read(binary=True)
         self.binningRed = '%s,%s' % (binningx, binningy)
 
     def saveBluState(self):
         output, errors = self.run_command('show -s lrisblue -terse outfile')
-        self.originalPrefixBlu = str(output.decode()).replace('\n', '')
-        output, errors = self.run_command('show -s lrisblue -terse binning')
-        for element in output.decode().replace('\t', '').split('\n'):
-            keyword = element.split(' ')[0]
-            if keyword == 'Xbinning':
-                binningx = element.split(' ')[1]
-            if keyword == 'Ybinning':
-                binningy = element.split(' ')[1]
-
+        self.originalPrefixBlu = lrisblue['outfile'].read()
+        binningx,binningy = lris['binning'].read(binary=True)
         self.binningBlu = '%s,%s' % (binningx, binningy)
 
     def redSideDone(self):
         self.expose_red.setEnabled(True)
-        self.run_command('modify -s lris outfile=%s' % self.originalPrefixRed)
-        self.run_command('modify -s lris ccdspeed=normal')
-        self.run_command('modify -s lris binning=%s' % (self.binningRed))
+        lris['outfile'].write(self.originalPrefixRed)
+        lris['ccdspeed'].write('normal')
+        lris['binning'].write(self.binningRed)
 
     def bluSideDone(self):
         self.expose_blu.setEnabled(True)
-        self.run_command('modify -s lrisblue outfile=%s' % self.originalPrefixBlu)
-        self.run_command('fullframeb')
-        self.run_command('modify -s lrisblue window=1,0,0,1024,2048')
-        self.run_command('modify -s lrisblue binning=%s' % (self.binningBlu))
+        lrisblue['outfile'].write(self.originalPrefixBlu)
+        lrisblue['numamps'].write(4)
+        lrisblue['amplist'].write('1,4,0,0')
+        lrisblue['ccdsel'].write('mosaic')
+        lrisblue['binning'].write('1,1')
+        lrisblue['window'].write('1,0,0,2048,4096')
+        lrisblue['prepix'].write(51)
+        lrisblue['postpix'].write(80)
+        lrisblue['binning'].write(self.binningBlu)
 
     def takeRedImages(self):
         self.saveRedState()
-        output, errors = self.run_command('modify -s lris outfile=rfoc_')
-        output, errors = self.run_command('fullnorm1x1')
-        output, errors = self.run_command('tintr 1')
-        output, errors = self.run_command('modify -s lris ccdspeed=fast')
+        lris['outfile'].write('rfoc_')
+        lris['binning'].write('1,1')
+        lris['pane'].write('0,0,4096,4096')
+        lris['ttime'].write(1)
+        lris['ccdspeed'].write('fast')
 
         center = self.center_red.text()
         step = self.step_red.text()
@@ -281,9 +276,16 @@ class MyWindow(QWidget):
 
     def takeBlueImages(self):
         self.saveBluState()
-        output, errors = self.run_command('modify -s lrisblue outfile=bfoc_')
-        output, errors = self.run_command('fullframeb')
-        output, errors = self.run_command('tintb 1')
+        lrisblue['outfile']=('bfoc_')
+        lrisblue['numamps'].write(4)
+        lrisblue['amplist'].write('1,4,0,0')
+        lrisblue['ccdsel'].write('mosaic')
+        lrisblue['binning'].write('1,1')
+        lrisblue['window'].write('1,0,0,2048,4096')
+        lrisblue['prepix'].write(51)
+        lrisblue['postpix'].write(80)
+        lrisblue['ttime'].write(1)
+
         center = self.center_blu.text()
         step = self.step_blu.text()
         number = self.number_blu.text()
