@@ -221,14 +221,24 @@ class MyWindow(QWidget):
             print("No files to examine in directory [%s]" % (directory))
 
     def turnOnLamps(self):
-        self.lriscal = ktl.cache('self.lriscal')
-        self.lriscal['neon'].write('on')
-        self.lriscal['mercury'].write('on')
-        self.lriscal['cadmium'].write('on')
-        self.lriscal['zinc'].write('on')
-        self.lriscal['feargon'].write('off')
-        self.lriscal['deuteri'].write('off')
-        self.lriscal['halogen'].write('off')
+        try:
+            self.lriscal = ktl.cache('self.lriscal')
+            self.lriscal['neon'].write('on')
+            self.lriscal['mercury'].write('on')
+            self.lriscal['cadmium'].write('on')
+            self.lriscal['zinc'].write('on')
+            self.lriscal['feargon'].write('off')
+            self.lriscal['deuteri'].write('off')
+            self.lriscal['halogen'].write('off')
+        except:
+            self.run_command('modify -s lriscal neon=on')
+            self.run_command('modify -s lriscal argon=on')
+            self.run_command('modify -s lriscal mercury=on')
+            self.run_command('modify -s lriscal cadmium=on')
+            self.run_command('modify -s lriscal zinc=on')
+            self.run_command('modify -s lriscal feargon=off')
+            self.run_command('modify -s lriscal deuteri=off')
+            self.run_command('modify -s lriscal halogen=off')
 
 
     def saveRedState(self):
