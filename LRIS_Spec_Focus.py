@@ -1,11 +1,9 @@
 import glob
 import os
-
 import subprocess
 import sys
 
 import ktl
-
 import matplotlib.pyplot as plt
 import numpy as np
 from PyQt5 import QtCore
@@ -13,7 +11,7 @@ from PyQt5.QtWidgets import QLabel, QHBoxLayout, QLineEdit, QPushButton, QVBoxLa
     QGridLayout
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
-
+# this imports the module written by S. Kwok.
 import SpecFocus
 
 
@@ -27,20 +25,22 @@ def main():
 class MyWindow(QWidget):
     def __init__(self, *args):
         super().__init__()
+        # runMode can be set to debug if we don't want to run the command, but just see that the buttons are connected correctly
         self.runMode = 'normal'
+        # creation of KTL services for lris and lrisblue
         self.lris = ktl.cache('lris')
         self.lrisblue = ktl.cache('lrisblue')
-        #self.runMode = 'debug'
+        # call to the main routine to create the interface
         self.init_ui()
 
     def init_ui(self):
         # create objects
-        # labels
 
         # turn on all lampss
         self.grid = QGridLayout()
         self.lampsOn = QPushButton('Turn on arc lamps')
         self.lampsOn.clicked.connect(self.turnOnLamps)
+
         # labels and buttons for the focus loop
         self.center_lbl = QLabel("Center")
         self.step_lbl = QLabel("Step")
@@ -48,6 +48,7 @@ class MyWindow(QWidget):
         self.red_lbl = QLabel("Red")
         self.blu_lbl = QLabel("Blue")
 
+        # default values for the focus loop
         self.center_red = QLineEdit()
         self.center_red.setText("-0.60")
         self.step_red = QLineEdit()
@@ -62,6 +63,7 @@ class MyWindow(QWidget):
         self.number_blu = QLineEdit()
         self.number_blu.setText("7")
 
+        # grid arrangement for the default values for the focus loop
         self.grid.addWidget(self.red_lbl, 1, 0)
         self.grid.addWidget(self.blu_lbl, 2, 0)
         self.grid.addWidget(self.center_lbl, 0, 1)
@@ -74,30 +76,39 @@ class MyWindow(QWidget):
         self.grid.addWidget(self.step_blu, 2, 2)
         self.grid.addWidget(self.number_blu, 2, 3)
 
+        # buttons to run the focus loop
 
-        # analyze self.expose_red = QPushButton("Take red focus images")
         self.expose_red = QPushButton("Take red focus images")
         self.expose_red.clicked.connect(self.takeRedImages)
+
         self.expose_blu = QPushButton("Take blue focus images")
         self.expose_blu.clicked.connect(self.takeBlueImages)
+
         self.analyze_red = QPushButton("Measure red focus")
         self.analyze_blu = QPushButton("Measure blue focus")
+
         self.analyze_blu.clicked.connect(self.analyzeFocus)
         self.analyze_red.clicked.connect(self.analyzeFocus)
         self.output = QTextEdit()
 
-        # create process calls
+        # create process calls. Here we use the built-in PYQT5 process management
         self.redimages = QtCore.QProcess(self)
         self.bluimages = QtCore.QProcess(self)
+        # connect the output of each process to a dataReady function
         self.redimages.readyRead.connect(self.dataReady)
         self.bluimages.readyRead.connect(self.dataReady)
+        # connect the start of a process to a simple function to disable the button (so we don't run it twice)
+        # and connect the end of the process to a cleanup function
         self.redimages.started.connect(lambda: self.expose_red.setEnabled(False))
         self.redimages.finished.connect(self.redSideDone)
         self.bluimages.started.connect(lambda: self.expose_blu.setEnabled(False))
         self.bluimages.finished.connect(self.bluSideDone)
 
+        # add a "quit" button
         self.qbtn = QPushButton("Done and Quit")
         self.qbtn.clicked.connect(self.allDone)
+
+        # the main layout
         self.vlayout1 = QVBoxLayout()
         self.vlayout1.addLayout(self.grid)
         self.vlayout1.addStretch(1)
@@ -119,12 +130,17 @@ class MyWindow(QWidget):
 
 
 
-
     def allDone(self):
 
+        """
+        Closes the GUI and quit
+        """
         self.close()
 
     def dataReady(self):
+        """
+        Captures the output of background processes using the readAll() method
+        """
         cursor = self.output.textCursor()
         cursor.movePosition(cursor.End)
         cursor.insertText(str(self.redimages.readAll(), 'utf-8'))
@@ -132,18 +148,20 @@ class MyWindow(QWidget):
         self.output.ensureCursorVisible()
 
     def showOutput(self, text):
+        """
+        Used to display a generic string into the output textbox
+        @param text: Text to display
+        """
         cursor = self.output.textCursor()
         cursor.movePosition(cursor.End)
         cursor.insertText(text)
         self.output.ensureCursorVisible()
 
     def plot(self):
-
-        plt.clf()
-
         """
         Plots the (focus, std) pairs
         """
+        plt.clf()
 
         xpoints = set(self.pairs[0])
         print(xpoints)
@@ -193,9 +211,11 @@ class MyWindow(QWidget):
 
 
     def analyzeFocus(self):
+        """
+        Reads the selected number of images and produces the data to be plotted
+        """
         # how many images do I look for:
         sender = self.sender().text()
-        print("The sender is %s" % (str(sender)))
         if sender == 'Measure red focus':
             prefix = 'rfoc*.fits'
             numberToAnalyze = int(self.number_red.text())
@@ -203,8 +223,8 @@ class MyWindow(QWidget):
             prefix = 'bfoc*.fits'
             numberToAnalyze = int(self.number_blu.text())
 
-        output, errors = self.run_command('ssh lriseng@lrisserver outdir')
-        directory = str(output.decode()).replace('\n', '')
+        # location of the output images
+        directory = self.lris['outdir'].read()
 
         self.files = glob.glob(os.path.join(directory, prefix))
         self.files.sort(key=os.path.getmtime)
@@ -221,7 +241,13 @@ class MyWindow(QWidget):
             print("No files to examine in directory [%s]" % (directory))
 
     def turnOnLamps(self):
+        """
+        Turn on the calibration lamps
+        """
         try:
+            """
+            If possible, use KTL, otherwise default to ssh
+            """
             self.lriscal = ktl.cache('self.lriscal')
             self.lriscal['neon'].write('on')
             self.lriscal['mercury'].write('on')
@@ -242,21 +268,33 @@ class MyWindow(QWidget):
 
 
     def saveRedState(self):
+        """
+        Save original parameters for red side
+        """
         self.originalPrefixRed = self.lris['outfile'].read()
         self.binningx_red,self.binningy_red = self.lris['binning'].read(binary=True)
 
 
     def saveBluState(self):
+        """
+        Save original parameters for blue side
+        """
         self.originalPrefixBlu = self.lrisblue['outfile'].read()
         self.binningx_blu,self.binningy_blu = self.lris['binning'].read(binary=True)
 
     def redSideDone(self):
+        """
+        Run when the red side images have been taken, to restore binning, ccdspeed, and original file names
+        """
         self.expose_red.setEnabled(True)
         self.lris['outfile'].write(self.originalPrefixRed)
         self.lris['ccdspeed'].write('normal')
         self.lris['binning'].write([self.binningx_red,self.binningy_red])
 
     def bluSideDone(self):
+        """
+        Run when the blue side images have been taken, to restore binning, ccdspeed, and original file names
+        """
         self.expose_blu.setEnabled(True)
         self.lrisblue['outfile'].write(self.originalPrefixBlu)
         self.lrisblue['numamps'].write(4)
@@ -269,6 +307,9 @@ class MyWindow(QWidget):
         self.lrisblue['binning'].write([self.binningx_blu,self.binningy_blu])
 
     def takeRedImages(self):
+        """
+        Using an ssh to lrisserver (which might not be needed), run the focus loop
+        """
         self.saveRedState()
         self.lris['outfile'].write('rfoc_')
         self.lris['binning'].write([1,1])
@@ -283,6 +324,9 @@ class MyWindow(QWidget):
         self.redimages.start('ssh', ['lriseng@lrisserver', 'focusloop', 'red', startingPoint, number, step])
 
     def takeBlueImages(self):
+        """
+        Using an ssh to lrisserver (which might not be needed), run the focus loop
+        """
         self.saveBluState()
         self.lrisblue['outfile'].write('bfoc_')
         self.lrisblue['numamps'].write(4)
@@ -301,6 +345,11 @@ class MyWindow(QWidget):
         self.bluimages.start('ssh', ['lriseng@lrisserver', 'focusloop', 'blue', startingPoint, number, step])
 
     def run_command(self, command):
+        """
+        Generic routine to run a command with call to the operating system
+        @param command: Command to run
+        @param return: Return code
+        """
         cmdline = command
         if self.runMode is 'debug':
             self.output.setText('Simulation mode\n Running:\n %s' % (cmdline))
@@ -314,7 +363,6 @@ class MyWindow(QWidget):
         except FileNotFoundError:
             output = ''
             errors = 'The command does not exist'
-        #self.output.setText(str(output))
         if len(errors)>0:
             output = output+errors
         self.showOutput(str(output.decode()).replace('\n', ''))
