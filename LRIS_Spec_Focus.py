@@ -36,10 +36,13 @@ class MyWindow(QWidget):
     def init_ui(self):
         # create objects
 
-        # turn on all lampss
+        # turn on all lamps
         self.grid = QGridLayout()
         self.lampsOn = QPushButton('Turn on arc lamps')
         self.lampsOn.clicked.connect(self.turnOnLamps)
+        # turn off all lamps
+        self.lampsOff = QPushButton('Turn off arc lamps')
+        self.lampsOff.clicked.connect(self.turnOffLamps)
 
         # labels and buttons for the focus loop
         self.center_lbl = QLabel("Center")
@@ -104,6 +107,13 @@ class MyWindow(QWidget):
         self.bluimages.started.connect(lambda: self.expose_blu.setEnabled(False))
         self.bluimages.finished.connect(self.bluSideDone)
 
+
+        # add buttons to set the focus
+        self.setBluFocus = QPushButton("Set blue camera focus")
+        self.setRedFocus = QPushButton("Set red camera focus")
+        self.setBluFocus.clicked.connect(self.setFocus)
+        self.setRedFocus.clicked.connect(self.setFocus)
+
         # add a "quit" button
         self.qbtn = QPushButton("Done and Quit")
         self.qbtn.clicked.connect(self.allDone)
@@ -117,6 +127,11 @@ class MyWindow(QWidget):
         self.vlayout1.addWidget(self.expose_blu)
         self.vlayout1.addWidget(self.analyze_red)
         self.vlayout1.addWidget(self.analyze_blu)
+        self.vlayout1.addWidget(self.lampsOff)
+        self.vlayout1.addWidget(self.setBluFocus)
+        self.vlayout1.addWidget(self.setRedFocus)
+        self.setBluFocus.setEnabled(False)
+        self.setRedFocus.setEnabled(False)
         self.vlayout1.addWidget(self.qbtn)
         self.vlayout1.addWidget(self.output)
 
@@ -128,6 +143,16 @@ class MyWindow(QWidget):
 
         self.setLayout(self.layout)
 
+    def setFocus(self):
+        sender =  self.sender().text()
+        if sender == 'Set blue camera focus':
+            lris = ktl.cache('lris')
+            lris['blufocus'].write(self.bestBluFocus)
+            self.showOutput("\nBlue focus set to %s\n" % str(self.bestBluFocus))
+        elif sender == 'Set red camera focus':
+            lris = ktl.cache('lris')
+            lris['redfocus'].write(self.bestRedFocus)
+            self.showOutput("\nRed focus set to %s\n" % str(self.bestRedFocus))
 
 
     def allDone(self):
@@ -224,7 +249,7 @@ class MyWindow(QWidget):
             numberToAnalyze = int(self.number_blu.text())
 
         # location of the output images
-        directory = self.lris['outdir'].read()
+        directory = '/s'+self.lris['outdir'].read()
 
         self.files = glob.glob(os.path.join(directory, prefix))
         self.files.sort(key=os.path.getmtime)
@@ -237,6 +262,13 @@ class MyWindow(QWidget):
             self.funcV, self.m0, self.b0, self.minX = SpecFocus.fitPairs(self.pairs)
             self.plot()
             self.showOutput("\nThe Focus is %.2f" % (float(self.minX)))
+            if sender == 'Measure red focus':
+                self.bestRedFocus = self.minX
+                self.setRedFocus.setEnabled(True)
+            elif sender == 'Measure blue focus':
+                self.bestBluFocus = self.minX
+                self.setBluFocus.setEnabled(True)
+
         else:
             print("No files to examine in directory [%s]" % (directory))
 
@@ -244,27 +276,35 @@ class MyWindow(QWidget):
         """
         Turn on the calibration lamps
         """
-        try:
-            """
-            If possible, use KTL, otherwise default to ssh
-            """
-            self.lriscal = ktl.cache('self.lriscal')
-            self.lriscal['neon'].write('on')
-            self.lriscal['mercury'].write('on')
-            self.lriscal['cadmium'].write('on')
-            self.lriscal['zinc'].write('on')
-            self.lriscal['feargon'].write('off')
-            self.lriscal['deuteri'].write('off')
-            self.lriscal['halogen'].write('off')
-        except:
-            self.run_command('ssh lriseng@lrisserver modify -s lriscal neon=on')
-            self.run_command('ssh lriseng@lrisserver modify -s lriscal argon=on')
-            self.run_command('ssh lriseng@lrisserver modify -s lriscal mercury=on')
-            self.run_command('ssh lriseng@lrisserver modify -s lriscal cadmium=on')
-            self.run_command('ssh lriseng@lrisserver modify -s lriscal zinc=on')
-            self.run_command('ssh lriseng@lrisserver modify -s lriscal feargon=off')
-            self.run_command('ssh lriseng@lrisserver modify -s lriscal deuteri=off')
-            self.run_command('ssh lriseng@lrisserver modify -s lriscal halogen=off')
+        lriscal = ktl.cache('lriscal')
+
+        self.showOutput("\nTurning on arc lamps.\n")
+        lriscal['argon'].write('on')
+        lriscal['neon'].write('on')
+        lriscal['mercury'].write('on')
+        lriscal['cadmium'].write('on')
+        lriscal['zinc'].write('on')
+        lriscal['feargon'].write('off')
+        lriscal['deuteri'].write('off')
+        lriscal['halogen'].write('off')
+        self.showOutput("\nLamps are on. \n Please wait 3 minutes for blue lamps to warm up.\n")
+
+    def turnOffLamps(self):
+        """
+        Turn off the calibration lamps
+        """
+        lriscal = ktl.cache('lriscal')
+
+        self.showOutput("\nTurning off arc lamps.\n")
+        lriscal['argon'].write('off')
+        lriscal['neon'].write('off')
+        lriscal['mercury'].write('off')
+        lriscal['cadmium'].write('off')
+        lriscal['zinc'].write('off')
+        lriscal['feargon'].write('off')
+        lriscal['deuteri'].write('off')
+        lriscal['halogen'].write('off')
+        self.showOutput("\nLamps are off.\n")
 
 
     def saveRedState(self):
@@ -322,6 +362,7 @@ class MyWindow(QWidget):
         number = self.number_red.text()
         startingPoint = str(float(center) - (float(step) * int(number) / 2))
         self.redimages.start('ssh', ['lriseng@lrisserver', 'focusloop', 'red', startingPoint, number, step])
+        #self.redimages.start('focusloop', ['red', startingPoint, number, step])
 
     def takeBlueImages(self):
         """
@@ -343,6 +384,7 @@ class MyWindow(QWidget):
         number = self.number_blu.text()
         startingPoint = str(float(center) - (float(step) * int(number) / 2))
         self.bluimages.start('ssh', ['lriseng@lrisserver', 'focusloop', 'blue', startingPoint, number, step])
+        #self.bluimages.start('focusloop', ['blue', startingPoint, number, step])
 
     def run_command(self, command):
         """
