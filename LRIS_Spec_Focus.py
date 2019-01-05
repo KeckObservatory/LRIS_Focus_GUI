@@ -2,11 +2,19 @@ import glob
 import os
 import subprocess
 import sys
+import time
+import traceback
 
-import ktl
+try:
+    import ktl
+    useKTL = True
+except:
+    print("KTL functions are not available")
+    useKTL = False
+
 import matplotlib.pyplot as plt
 import numpy as np
-from PyQt5 import QtCore
+from PyQt5.QtCore import *
 from PyQt5.QtWidgets import QLabel, QHBoxLayout, QLineEdit, QPushButton, QVBoxLayout, QApplication, QWidget, QTextEdit, \
     QGridLayout
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -20,6 +28,70 @@ def main():
     w = MyWindow()
     w.show()
     sys.exit(app.exec_())
+class WorkerSignals(QObject):
+    '''
+    Defines the signals available from a running worker thread.
+
+    Supported signals are:
+
+    finished
+        No data
+
+    error
+        `tuple` (exctype, value, traceback.format_exc() )
+
+    result
+        `object` data returned from processing, anything
+
+    progress
+        `int` indicating % progress
+
+    '''
+    finished = pyqtSignal()
+    started = pyqtSignal()
+    error = pyqtSignal(tuple)
+    result = pyqtSignal(object)
+    output = pyqtSignal(object)
+
+
+class Worker(QRunnable):
+    '''
+    Worker thread
+
+    Inherits from QRunnable to handler worker thread setup, signals and wrap-up.
+
+    :param callback: The function callback to run on this worker thread. Supplied args and
+                     kwargs will be passed through to the runner.
+    :type callback: function
+    :param args: Arguments to pass to the callback function
+    :param kwargs: Keywords to pass to the callback function
+
+    '''
+    def __init__(self, fn, *args, **kwargs):
+        super(Worker, self).__init__()
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+        self.signals = WorkerSignals()
+
+        self.kwargs['output_callback'] = self.signals.output
+
+    @pyqtSlot()
+    def run(self):
+        # Retrieve args/kwargs here; and fire processing using them
+        try:
+            self.signals.started.emit()
+            result = self.fn(*self.args, **self.kwargs)
+        except:
+            traceback.print_exc()
+            exctype, value = sys.exc_info()[:2]
+            self.signals.error.emit((exctype, value, traceback.format_exc()))
+        else:
+            self.signals.result.emit(result)  # Return the result of the processing
+        finally:
+            self.signals.finished.emit()  # Done
+
+
 
 
 class MyWindow(QWidget):
@@ -28,9 +100,12 @@ class MyWindow(QWidget):
         # runMode can be set to debug if we don't want to run the command, but just see that the buttons are connected correctly
         self.runMode = 'normal'
         # creation of KTL services for lris and lrisblue
-        self.lris = ktl.cache('lris')
-        self.lrisblue = ktl.cache('lrisblue')
+        if useKTL:
+            self.lris = ktl.cache('lris')
+            self.lrisblue = ktl.cache('lrisblue')
         # call to the main routine to create the interface
+        self.threadpool = QThreadPool()
+        print("Multithreading with maximum %d threads" % self.threadpool.maxThreadCount())
         self.init_ui()
 
     def init_ui(self):
@@ -95,17 +170,17 @@ class MyWindow(QWidget):
         self.output = QTextEdit()
 
         # create process calls. Here we use the built-in PYQT5 process management
-        self.redimages = QtCore.QProcess(self)
-        self.bluimages = QtCore.QProcess(self)
+        #self.redimages = QtCore.QProcess(self)
+        #self.bluimages = QtCore.QProcess(self)
         # connect the output of each process to a dataReady function
-        self.redimages.readyRead.connect(self.dataReady)
-        self.bluimages.readyRead.connect(self.dataReady)
+        #self.redimages.readyRead.connect(self.dataReady)
+        #self.bluimages.readyRead.connect(self.dataReady)
         # connect the start of a process to a simple function to disable the button (so we don't run it twice)
         # and connect the end of the process to a cleanup function
-        self.redimages.started.connect(lambda: self.expose_red.setEnabled(False))
-        self.redimages.finished.connect(self.redSideDone)
-        self.bluimages.started.connect(lambda: self.expose_blu.setEnabled(False))
-        self.bluimages.finished.connect(self.bluSideDone)
+        #self.redimages.started.connect(lambda: self.expose_red.setEnabled(False))
+        #self.redimages.finished.connect(self.redSideDone)
+        #self.bluimages.started.connect(lambda: self.expose_blu.setEnabled(False))
+        #self.bluimages.finished.connect(self.bluSideDone)
 
 
         # add buttons to set the focus
@@ -135,7 +210,7 @@ class MyWindow(QWidget):
         self.vlayout1.addWidget(self.qbtn)
         self.vlayout1.addWidget(self.output)
 
-        self.figure = plt.figure(figsize=(10, 5))
+        self.figure = plt.figure(figsize=(5, 5))
         self.canvas = FigureCanvas(self.figure)
         self.layout = QHBoxLayout()
         self.layout.addLayout(self.vlayout1)
@@ -276,115 +351,244 @@ class MyWindow(QWidget):
         """
         Turn on the calibration lamps
         """
-        lriscal = ktl.cache('lriscal')
+        if useKTL:
+            lriscal = ktl.cache('lriscal')
 
-        self.showOutput("\nTurning on arc lamps.\n")
-        lriscal['argon'].write('on')
-        lriscal['neon'].write('on')
-        lriscal['mercury'].write('on')
-        lriscal['cadmium'].write('on')
-        lriscal['zinc'].write('on')
-        lriscal['feargon'].write('off')
-        lriscal['deuteri'].write('off')
-        lriscal['halogen'].write('off')
-        self.showOutput("\nLamps are on. \n Please wait 3 minutes for blue lamps to warm up.\n")
+            self.showOutput("\nTurning on arc lamps.\n")
+            lriscal['argon'].write('on')
+            lriscal['neon'].write('on')
+            lriscal['mercury'].write('on')
+            lriscal['cadmium'].write('on')
+            lriscal['zinc'].write('on')
+            lriscal['feargon'].write('off')
+            lriscal['deuteri'].write('off')
+            lriscal['halogen'].write('off')
+            self.showOutput("\nLamps are on. \n Please wait 3 minutes for blue lamps to warm up.\n")
+        else:
+            self.showOutput("\n KTL is NOT ENABLED")
 
     def turnOffLamps(self):
         """
         Turn off the calibration lamps
         """
-        lriscal = ktl.cache('lriscal')
+        if useKTL:
+            lriscal = ktl.cache('lriscal')
 
-        self.showOutput("\nTurning off arc lamps.\n")
-        lriscal['argon'].write('off')
-        lriscal['neon'].write('off')
-        lriscal['mercury'].write('off')
-        lriscal['cadmium'].write('off')
-        lriscal['zinc'].write('off')
-        lriscal['feargon'].write('off')
-        lriscal['deuteri'].write('off')
-        lriscal['halogen'].write('off')
-        self.showOutput("\nLamps are off.\n")
-
+            self.showOutput("\nTurning off arc lamps.\n")
+            lriscal['argon'].write('off')
+            lriscal['neon'].write('off')
+            lriscal['mercury'].write('off')
+            lriscal['cadmium'].write('off')
+            lriscal['zinc'].write('off')
+            lriscal['feargon'].write('off')
+            lriscal['deuteri'].write('off')
+            lriscal['halogen'].write('off')
+            self.showOutput("\nLamps are off.\n")
+        else:
+            self.showOutput("\n KTL is NOT ENABLED")
 
     def saveRedState(self):
         """
         Save original parameters for red side
         """
-        self.originalPrefixRed = self.lris['outfile'].read()
-        self.binningx_red,self.binningy_red = self.lris['binning'].read(binary=True)
+        if useKTL:
+            self.originalPrefixRed = self.lris['outfile'].read()
+            self.binningx_red,self.binningy_red = self.lris['binning'].read(binary=True)
 
 
     def saveBluState(self):
         """
         Save original parameters for blue side
         """
-        self.originalPrefixBlu = self.lrisblue['outfile'].read()
-        self.binningx_blu,self.binningy_blu = self.lris['binning'].read(binary=True)
+        if useKTL:
+            self.originalPrefixBlu = self.lrisblue['outfile'].read()
+            self.binningx_blu,self.binningy_blu = self.lris['binning'].read(binary=True)
 
     def redSideDone(self):
         """
         Run when the red side images have been taken, to restore binning, ccdspeed, and original file names
         """
         self.expose_red.setEnabled(True)
-        self.lris['outfile'].write(self.originalPrefixRed)
-        self.lris['ccdspeed'].write('normal')
-        self.lris['binning'].write([self.binningx_red,self.binningy_red])
+        self.showOutput("Red side focus images complete\n")
+        if useKTL:
+            self.lris['outfile'].write(self.originalPrefixRed)
+            self.lris['ccdspeed'].write('normal')
+            self.lris['binning'].write([self.binningx_red,self.binningy_red])
 
     def bluSideDone(self):
         """
         Run when the blue side images have been taken, to restore binning, ccdspeed, and original file names
         """
         self.expose_blu.setEnabled(True)
-        self.lrisblue['outfile'].write(self.originalPrefixBlu)
-        self.lrisblue['numamps'].write(4)
-        self.lrisblue['amplist'].write([1,4,0,0])
-        self.lrisblue['ccdsel'].write('mosaic')
-        self.lrisblue['binning'].write([1,1])
-        self.lrisblue['window'].write([1,0,0,2048,4096])
-        self.lrisblue['prepix'].write(51)
-        self.lrisblue['postpix'].write(80)
-        self.lrisblue['binning'].write([self.binningx_blu,self.binningy_blu])
+        self.showOutput("Blue side focus images complete\n")
+        if useKTL:
+            self.lrisblue['outfile'].write(self.originalPrefixBlu)
+            self.lrisblue['numamps'].write(4)
+            self.lrisblue['amplist'].write([1,4,0,0])
+            self.lrisblue['ccdsel'].write('mosaic')
+            self.lrisblue['binning'].write([1,1])
+            self.lrisblue['window'].write([1,0,0,2048,4096])
+            self.lrisblue['prepix'].write(51)
+            self.lrisblue['postpix'].write(80)
+            self.lrisblue['binning'].write([self.binningx_blu,self.binningy_blu])
 
     def takeRedImages(self):
         """
         Using an ssh to lrisserver (which might not be needed), run the focus loop
         """
         self.saveRedState()
-        self.lris['outfile'].write('rfoc_')
-        self.lris['binning'].write([1,1])
-        self.lris['pane'].write([0,0,4096,4096])
-        self.lris['ttime'].write(1)
-        self.lris['ccdspeed'].write('fast')
+        if useKTL:
+            self.lris['outfile'].write('rfoc_')
+            self.lris['binning'].write([1,1])
+            self.lris['pane'].write([0,0,4096,4096])
+            self.lris['ttime'].write(1)
+            self.lris['ccdspeed'].write('fast')
+            self.lris['object'].write('Focus loop')
 
-        center = self.center_red.text()
-        step = self.step_red.text()
-        number = self.number_red.text()
-        startingPoint = str(float(center) - (float(step) * int(number) / 2))
-        self.redimages.start('ssh', ['lriseng@lrisserver', 'focusloop', 'red', startingPoint, number, step])
-        #self.redimages.start('focusloop', ['red', startingPoint, number, step])
+        center = float(self.center_red.text())
+        step = float(self.step_red.text())
+        number = int(self.number_red.text())
+        startingPoint = float(center - (step * (number / 2)))
+
+        worker = Worker(self.focusloop, 'red', startingPoint, number, step)
+        worker.signals.started.connect(lambda: self.expose_red.setEnabled(False))
+        worker.signals.result.connect(self.showOutput)
+        worker.signals.output.connect(self.showOutput)
+        worker.signals.finished.connect(self.redSideDone)
+        self.threadpool.start(worker)
+
 
     def takeBlueImages(self):
         """
         Using an ssh to lrisserver (which might not be needed), run the focus loop
         """
         self.saveBluState()
-        self.lrisblue['outfile'].write('bfoc_')
-        self.lrisblue['numamps'].write(4)
-        self.lrisblue['amplist'].write([1,4,0,0])
-        self.lrisblue['ccdsel'].write('mosaic')
-        self.lrisblue['binning'].write([1,1])
-        self.lrisblue['window'].write([1,0,0,2048,4096])
-        self.lrisblue['prepix'].write(51)
-        self.lrisblue['postpix'].write(80)
-        self.lrisblue['ttime'].write(1)
+        if useKTL:
+            self.lrisblue['outfile'].write('bfoc_')
+            self.lrisblue['numamps'].write(4)
+            self.lrisblue['amplist'].write([1,4,0,0])
+            self.lrisblue['ccdsel'].write('mosaic')
+            self.lrisblue['binning'].write([1,1])
+            self.lrisblue['window'].write([1,0,0,2048,4096])
+            self.lrisblue['prepix'].write(51)
+            self.lrisblue['postpix'].write(80)
+            self.lrisblue['ttime'].write(1)
+            self.lrisblue['object'].write('Focus loop')
 
-        center = self.center_blu.text()
-        step = self.step_blu.text()
-        number = self.number_blu.text()
-        startingPoint = str(float(center) - (float(step) * int(number) / 2))
-        self.bluimages.start('ssh', ['lriseng@lrisserver', 'focusloop', 'blue', startingPoint, number, step])
+        center = float(self.center_blu.text())
+        step = int(self.step_blu.text())
+        number = int(self.number_blu.text())
+        startingPoint = float(center - (step * (number / 2)))
+
+        worker = Worker(self.focusloop,'blue',startingPoint, number, step)
+        worker.signals.started.connect(lambda: self.expose_blu.setEnabled(False))
+        worker.signals.result.connect(self.showOutput)
+        worker.signals.output.connect(self.showOutput)
+        worker.signals.finished.connect(self.bluSideDone)
+        self.threadpool.start(worker)
+        #self.bluimages.start('ssh', ['lriseng@lrisserver', 'focusloop', 'blue', startingPoint, number, step])
         #self.bluimages.start('focusloop', ['blue', startingPoint, number, step])
+
+    def setLrisFocus(self,side, value):
+
+        if useKTL is False:
+            return
+        lris= ktl.cache('lris')
+        if side == 'red':
+            keyword = lris['redfocus']
+        elif side == 'blue':
+            keyword = lris['blufocus']
+        else:
+            return
+        keyword.write(self.bestBluFocus)
+        self.showOutput("\n%s focus set to %s\n" % (side, str(self.bestBluFocus)))
+
+    def focusloop(self, side, startingPoint, number_of_steps, increment, output_callback):
+
+        backlash_correction = {}
+        backlash_correction['red'] = -1.0
+        backlash_correction['blue'] = -200
+
+        if side not in ['red', 'blue']:
+            self.showOutput(self, 'Error in side specification')
+            return
+
+        if number_of_steps > 100:
+            self.showOutput(self, 'Too many steps requested')
+            return
+
+        # backlash correction
+        self.setLrisFocus(side, startingPoint + backlash_correction[side])
+
+        for step in range(number_of_steps):
+            focus = startingPoint + step * increment
+            self.setLrisFocus(side, focus)
+            #print("Acquiring %s image at focus value %f\n" % (side,focus))
+
+            #self.showOutput("Acquiring %s image at focus value %f\n" % (side,focus))
+            output_callback.emit("Acquiring %s image at focus value %f\n" % (side,focus))
+            if side == 'red':
+                self.goir()
+            elif side == 'blue':
+                self.goib()
+
+
+    def goib(self):
+        if useKTL is False:
+            time.sleep(1)
+            return
+        # create and monitor keywords
+        lrisb = ktl.cache('lrisblue')
+        exposip = lrib['exposip']
+        wcrate = lrib['wcrate']
+        rserv = lrisb['rserv']
+        object = lrib['object']
+        ttime = lrisb['ttime']
+        expose = lrisb['expose']
+        keywords = [exposip, wcrate, rserv, object, ttime, expose]
+        for key in keywords:
+            key.monitor()
+
+        # make sure no other exposure is in progress
+        exposip.waitFor('==False')
+        wcrate.waitFor('==False')
+        rserv.waitFor('==False')
+
+        # start the exposure
+        expose.write(True, wait=True)
+
+        # wait for end of exposure
+        wcrate.waitFor('==True')
+        wcrate.waitFor('==False', timeout = 200)
+        rserv.waitFor('==False', timeout = 200)
+
+    def goir(self):
+        if useKTL is False:
+            time.sleep(1)
+            return
+        # create and monitor keywords
+        lris = ktl.cache('lris')
+        observip = lris['observip']
+        #exposip = lrib['exposip']
+        wcrate = lri['wcrate']
+        #rserv = lrisb['rserv']
+        #object = lrib['object']
+        #ttime = lrisb['ttime']
+        expose = lris['expose']
+        keywords = [expose, observip, wcrate]
+        for key in keywords:
+            key.monitor()
+
+        # make sure no other exposure is in progress
+        observip.waitFor('==False')
+
+        # start the exposure
+        expose.write(True, wait=True)
+
+        # wait for end of exposure
+        wcrate.waitFor('==True')
+        observip.waitFor('==False', timeout = 200)
+
 
     def run_command(self, command):
         """
