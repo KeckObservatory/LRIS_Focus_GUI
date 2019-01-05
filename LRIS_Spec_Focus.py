@@ -489,9 +489,10 @@ class MyWindow(QWidget):
         #self.bluimages.start('ssh', ['lriseng@lrisserver', 'focusloop', 'blue', startingPoint, number, step])
         #self.bluimages.start('focusloop', ['blue', startingPoint, number, step])
 
-    def setLrisFocus(self,side, value):
+    def setLrisFocus(self,side, value, output_callback):
 
         if useKTL is False:
+            output_callback.emit("KTL not available, not setting focus\n")
             return
         lris= ktl.cache('lris')
         if side == 'red':
@@ -499,12 +500,12 @@ class MyWindow(QWidget):
         elif side == 'blue':
             keyword = lris['blufocus']
             if value<-3820:
-                self.showOutput("Blue focus value is beyond limits. Resetting to -3820\n")
+                output_callback.emit("Blue focus value is beyond limits. Resetting to -3820\n")
                 value = -3820
         else:
             return
         keyword.write(value)
-        self.showOutput("\n%s focus set to %s\n" % (side, str(value)))
+        output_callback.emit("\n%s focus set to %s\n" % (side, str(value)))
 
     def focusloop(self, side, startingPoint, number_of_steps, increment, output_callback):
 
@@ -521,11 +522,11 @@ class MyWindow(QWidget):
             return
 
         # backlash correction
-        self.setLrisFocus(side, startingPoint + backlash_correction[side])
+        self.setLrisFocus(side, startingPoint + backlash_correction[side], output_callback)
 
         for step in range(1,number_of_steps):
             focus = startingPoint + step * increment
-            self.setLrisFocus(side, focus)
+            self.setLrisFocus(side, focus, output_callback)
             #print("Acquiring %s image at focus value %f\n" % (side,focus))
 
             #self.showOutput("Acquiring %s image at focus value %f\n" % (side,focus))
