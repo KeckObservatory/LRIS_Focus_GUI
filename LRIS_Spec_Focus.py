@@ -473,7 +473,7 @@ class MyWindow(QWidget):
             self.lrisblue['prepix'].write(51)
             self.lrisblue['postpix'].write(80)
             self.lrisblue['ttime'].write(1)
-            self.lrisblue['object'].write('Focus loop')
+            self.lris['object'].write('Focus loop')
 
         center = float(self.center_blu.text())
         step = int(self.step_blu.text())
@@ -498,10 +498,13 @@ class MyWindow(QWidget):
             keyword = lris['redfocus']
         elif side == 'blue':
             keyword = lris['blufocus']
+            if value<-3820:
+                self.showOutput("Blue focus value is beyond limits. Resetting to -3820\n")
+                value = -3820
         else:
             return
-        keyword.write(self.bestBluFocus)
-        self.showOutput("\n%s focus set to %s\n" % (side, str(self.bestBluFocus)))
+        keyword.write(value)
+        self.showOutput("\n%s focus set to %s\n" % (side, str(value)))
 
     def focusloop(self, side, startingPoint, number_of_steps, increment, output_callback):
 
@@ -520,13 +523,13 @@ class MyWindow(QWidget):
         # backlash correction
         self.setLrisFocus(side, startingPoint + backlash_correction[side])
 
-        for step in range(number_of_steps):
+        for step in range(1,number_of_steps):
             focus = startingPoint + step * increment
             self.setLrisFocus(side, focus)
             #print("Acquiring %s image at focus value %f\n" % (side,focus))
 
             #self.showOutput("Acquiring %s image at focus value %f\n" % (side,focus))
-            output_callback.emit("Acquiring %s image at focus value %f\n" % (side,focus))
+            output_callback.emit("Image %d of %d: %s image at focus value %f\n" % (step, number_of_steps,side,focus))
             if side == 'red':
                 self.goir()
             elif side == 'blue':
@@ -539,13 +542,13 @@ class MyWindow(QWidget):
             return
         # create and monitor keywords
         lrisb = ktl.cache('lrisblue')
-        exposip = lrib['exposip']
-        wcrate = lrib['wcrate']
+        exposip = lrisb['exposip']
+        wcrate = lrisb['wcrate']
         rserv = lrisb['rserv']
-        object = lrib['object']
+        #object = lrisb['object']
         ttime = lrisb['ttime']
         expose = lrisb['expose']
-        keywords = [exposip, wcrate, rserv, object, ttime, expose]
+        keywords = [exposip, wcrate, rserv, ttime]
         for key in keywords:
             key.monitor()
 
@@ -570,12 +573,12 @@ class MyWindow(QWidget):
         lris = ktl.cache('lris')
         observip = lris['observip']
         #exposip = lrib['exposip']
-        wcrate = lri['wcrate']
+        wcrate = lris['wcrate']
         #rserv = lrisb['rserv']
         #object = lrib['object']
         #ttime = lrisb['ttime']
         expose = lris['expose']
-        keywords = [expose, observip, wcrate]
+        keywords = [observip, wcrate]
         for key in keywords:
             key.monitor()
 
