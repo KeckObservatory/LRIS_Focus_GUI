@@ -111,13 +111,20 @@ class MyWindow(QWidget):
     def init_ui(self):
         # create objects
 
+        self.redColor = 'LightCoral'
+        self.bluColor = 'SkyBlue'
+        self.genericColor = 'Gold'
+        self.doneColor = 'LawnGreen'
+
         # turn on all lamps
         self.grid = QGridLayout()
         self.lampsOn = QPushButton('Turn on arc lamps')
-        self.lampsOn.clicked.connect(self.turnOnLamps)
+        self.lampsOn.setStyleSheet("background-color: %s" % self.genericColor)
+        self.lampsOn.clicked.connect(self.run_turnOnLamps)
         # turn off all lamps
         self.lampsOff = QPushButton('Turn off arc lamps')
-        self.lampsOff.clicked.connect(self.turnOffLamps)
+        self.lampsOff.setStyleSheet("background-color: %s" % self.genericColor)
+        self.lampsOff.clicked.connect(self.run_turnOffLamps)
 
         # labels and buttons for the focus loop
         self.center_lbl = QLabel("Center")
@@ -157,13 +164,17 @@ class MyWindow(QWidget):
         # buttons to run the focus loop
 
         self.expose_red = QPushButton("Take red focus images")
+        self.expose_red.setStyleSheet("background-color: %s" % self.redColor)
         self.expose_red.clicked.connect(self.takeRedImages)
 
         self.expose_blu = QPushButton("Take blue focus images")
+        self.expose_blu.setStyleSheet("background-color: %s" % self.bluColor)
         self.expose_blu.clicked.connect(self.takeBlueImages)
 
         self.analyze_red = QPushButton("Measure red focus")
+        self.analyze_red.setStyleSheet("background-color: %s" % self.redColor)
         self.analyze_blu = QPushButton("Measure blue focus")
+        self.analyze_blu.setStyleSheet("background-color: %s" % self.bluColor)
 
         self.analyze_blu.clicked.connect(self.analyzeFocus)
         self.analyze_red.clicked.connect(self.analyzeFocus)
@@ -178,19 +189,22 @@ class MyWindow(QWidget):
         # connect the start of a process to a simple function to disable the button (so we don't run it twice)
         # and connect the end of the process to a cleanup function
         #self.redimages.started.connect(lambda: self.expose_red.setEnabled(False))
-        #self.redimages.finished.connect(self.redSideDone)
+        #Self.redimages.finished.connect(self.redSideDone)
         #self.bluimages.started.connect(lambda: self.expose_blu.setEnabled(False))
         #self.bluimages.finished.connect(self.bluSideDone)
 
 
         # add buttons to set the focus
         self.setBluFocus = QPushButton("Set blue camera focus")
+        self.setBluFocus.setStyleSheet("background-color: %s" % self.bluColor)
         self.setRedFocus = QPushButton("Set red camera focus")
+        self.setRedFocus.setStyleSheet("background-color: %s" % self.redColor)
         self.setBluFocus.clicked.connect(self.setFocus)
         self.setRedFocus.clicked.connect(self.setFocus)
 
         # add a "quit" button
         self.qbtn = QPushButton("Done and Quit")
+        self.qbtn.setStyleSheet("background-color: %s" % self.doneColor)
         self.qbtn.clicked.connect(self.allDone)
 
         # the main layout
@@ -347,34 +361,55 @@ class MyWindow(QWidget):
         else:
             print("No files to examine in directory [%s]" % (directory))
 
-    def turnOnLamps(self):
+    def run_turnOnLamps(self):
         """
         Turn on the calibration lamps
         """
-        if useKTL:
-            lriscal = ktl.cache('lriscal')
+        worker = Worker(self.turnOnLamps)
+        worker.signals.started.connect(lambda: self.lampsOn.setEnabled(False))
+        worker.signals.result.connect(self.showOutput)
+        worker.signals.output.connect(self.showOutput)
+        worker.signals.finished.connect(lambda: self.lampsOn.setEnabled(True))
+        self.threadpool.start(worker)
 
-            self.showOutput("\nTurning on arc lamps.\n")
+    def turnOnLamps(self, output_callback):
+        if useKTL:
+            output_callback.emit("\nTurning on arc lamps.\n")
+            lriscal = ktl.cache('lriscal')
+            output_callback.emit("Argon..")
             lriscal['argon'].write('on')
+            output_callback.emit("Neon..")
             lriscal['neon'].write('on')
+            output_callback.emit("Mercury..")
             lriscal['mercury'].write('on')
+            output_callback.emit("Cadmium..")
             lriscal['cadmium'].write('on')
+            output_callback.emit("Zinc..\n")
             lriscal['zinc'].write('on')
+            output_callback.emit("Turning off FeAr, Deuterium and Halogen\n")
             lriscal['feargon'].write('off')
             lriscal['deuteri'].write('off')
             lriscal['halogen'].write('off')
-            self.showOutput("\nLamps are on. \n Please wait 3 minutes for blue lamps to warm up.\n")
+            output_callback.emit("\nLamps are on. \n Please wait 3 minutes for blue lamps to warm up.\n")
         else:
-            self.showOutput("\n KTL is NOT ENABLED")
+            output_callback.emit("\n KTL is NOT ENABLED")
 
-    def turnOffLamps(self):
+    def run_turnOffLamps(self):
+        worker = Worker(self.turnOffLamps)
+        worker.signals.started.connect(lambda: self.lampsOff.setEnabled(False))
+        worker.signals.result.connect(self.showOutput)
+        worker.signals.output.connect(self.showOutput)
+        worker.signals.finished.connect(lambda: self.lampsOff.setEnabled(True))
+        self.threadpool.start(worker)
+
+    def turnOffLamps(self, output_callback):
         """
         Turn off the calibration lamps
         """
         if useKTL:
             lriscal = ktl.cache('lriscal')
 
-            self.showOutput("\nTurning off arc lamps.\n")
+            output_callback.emit("\nTurning off arc lamps.\n")
             lriscal['argon'].write('off')
             lriscal['neon'].write('off')
             lriscal['mercury'].write('off')
@@ -383,9 +418,9 @@ class MyWindow(QWidget):
             lriscal['feargon'].write('off')
             lriscal['deuteri'].write('off')
             lriscal['halogen'].write('off')
-            self.showOutput("\nLamps are off.\n")
+            output_callback.emit("\nLamps are off.\n")
         else:
-            self.showOutput("\n KTL is NOT ENABLED")
+            output_callback.emit("\n KTL is NOT ENABLED")
 
     def saveRedState(self):
         """
@@ -513,23 +548,23 @@ class MyWindow(QWidget):
         backlash_correction['blue'] = -200
 
         if side not in ['red', 'blue']:
-            self.showOutput(self, 'Error in side specification')
+            output_callback.emit(self, 'Error in side specification')
             return
 
         if number_of_steps > 100:
-            self.showOutput(self, 'Too many steps requested')
+            output_callback.emit(self, 'Too many steps requested')
             return
 
         # backlash correction
         self.setLrisFocus(side, startingPoint + backlash_correction[side])
 
-        for step in range(1,number_of_steps):
+        for step in range(0,number_of_steps-1):
             focus = startingPoint + step * increment
             self.setLrisFocus(side, focus)
             #print("Acquiring %s image at focus value %f\n" % (side,focus))
 
             #self.showOutput("Acquiring %s image at focus value %f\n" % (side,focus))
-            output_callback.emit("Image %d of %d: %s image at focus value %f\n" % (step, number_of_steps,side,focus))
+            output_callback.emit("Image %d of %d: %s image at focus value %f\n" % (step+1, number_of_steps,side,focus))
             if side == 'red':
                 self.goir()
             elif side == 'blue':
