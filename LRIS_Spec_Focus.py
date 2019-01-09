@@ -205,7 +205,7 @@ class MyWindow(QWidget):
         # create the output window
 
         self.output = QTextEdit()
-        self.output.setMinimumSize(280, 500)
+        self.output.setMinimumSize(280, 400)
         self.highlighter = Highlighter(self.output.document())
 
 
