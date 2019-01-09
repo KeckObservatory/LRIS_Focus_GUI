@@ -15,6 +15,7 @@ except:
 import matplotlib.pyplot as plt
 import numpy as np
 from PyQt5.QtCore import *
+from PyQt5.QtGui import *
 from PyQt5.QtWidgets import QLabel, QHBoxLayout, QLineEdit, QPushButton, QVBoxLayout, QApplication, QWidget, QTextEdit, \
     QGridLayout
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -28,6 +29,8 @@ def main():
     w = MyWindow()
     w.show()
     sys.exit(app.exec_())
+
+
 class WorkerSignals(QObject):
     '''
     Defines the signals available from a running worker thread.
@@ -91,7 +94,21 @@ class Worker(QRunnable):
         finally:
             self.signals.finished.emit()  # Done
 
+class Highlighter(QSyntaxHighlighter):
+    def __init__(self, parent):
+        super(Highlighter, self).__init__(parent)
+        self.bluFormat = QTextCharFormat()
+        self.bluFormat.setForeground(Qt.blue)
+        self.redFormat = QTextCharFormat()
+        self.redFormat.setForeground(Qt.red)
 
+    def highlightBlock(self, text):
+        # uncomment this line for Python2
+        # text = unicode(text)
+        if text.startswith('[BLUE]'):
+            self.setFormat(0, len(text), self.bluFormat)
+        elif text.startswith('[RED]'):
+            self.setFormat(0, len(text), self.redFormat)
 
 
 class MyWindow(QWidget):
@@ -117,7 +134,6 @@ class MyWindow(QWidget):
         self.doneColor = 'LawnGreen'
 
         # turn on all lamps
-        self.grid = QGridLayout()
         self.lampsOn = QPushButton('Turn on arc lamps')
         self.lampsOn.setStyleSheet("background-color: %s" % self.genericColor)
         self.lampsOn.clicked.connect(self.run_turnOnLamps)
@@ -125,6 +141,10 @@ class MyWindow(QWidget):
         self.lampsOff = QPushButton('Turn off arc lamps')
         self.lampsOff.setStyleSheet("background-color: %s" % self.genericColor)
         self.lampsOff.clicked.connect(self.run_turnOffLamps)
+        # set default TDA configuration
+        self.tdaConfig = QPushButton('[OPTIONAL] Set default TDA/ToO configuration')
+        self.tdaConfig.setStyleSheet("background-color: %s" % self.genericColor)
+        self.tdaConfig.clicked.connect(self.run_tdaConfig)
 
         # labels and buttons for the focus loop
         self.center_lbl = QLabel("Center")
@@ -149,6 +169,7 @@ class MyWindow(QWidget):
         self.number_blu.setText("7")
 
         # grid arrangement for the default values for the focus loop
+        self.grid = QGridLayout()
         self.grid.addWidget(self.red_lbl, 1, 0)
         self.grid.addWidget(self.blu_lbl, 2, 0)
         self.grid.addWidget(self.center_lbl, 0, 1)
@@ -162,6 +183,8 @@ class MyWindow(QWidget):
         self.grid.addWidget(self.number_blu, 2, 3)
 
         # buttons to run the focus loop
+        
+        self.grid1 = QGridLayout()
 
         self.expose_red = QPushButton("Take red focus images")
         self.expose_red.setStyleSheet("background-color: %s" % self.redColor)
@@ -178,20 +201,12 @@ class MyWindow(QWidget):
 
         self.analyze_blu.clicked.connect(self.analyzeFocus)
         self.analyze_red.clicked.connect(self.analyzeFocus)
-        self.output = QTextEdit()
 
-        # create process calls. Here we use the built-in PYQT5 process management
-        #self.redimages = QtCore.QProcess(self)
-        #self.bluimages = QtCore.QProcess(self)
-        # connect the output of each process to a dataReady function
-        #self.redimages.readyRead.connect(self.dataReady)
-        #self.bluimages.readyRead.connect(self.dataReady)
-        # connect the start of a process to a simple function to disable the button (so we don't run it twice)
-        # and connect the end of the process to a cleanup function
-        #self.redimages.started.connect(lambda: self.expose_red.setEnabled(False))
-        #Self.redimages.finished.connect(self.redSideDone)
-        #self.bluimages.started.connect(lambda: self.expose_blu.setEnabled(False))
-        #self.bluimages.finished.connect(self.bluSideDone)
+        # create the output window
+
+        self.output = QTextEdit()
+        self.output.setMinimumSize(280, 500)
+        self.highlighter = Highlighter(self.output.document())
 
 
         # add buttons to set the focus
@@ -202,6 +217,15 @@ class MyWindow(QWidget):
         self.setBluFocus.clicked.connect(self.setFocus)
         self.setRedFocus.clicked.connect(self.setFocus)
 
+        # create the grid for the red and blue functions
+        self.grid1.addWidget(self.expose_red,0,1)
+        self.grid1.addWidget(self.expose_blu,0,0)
+        self.grid1.addWidget(self.analyze_red,1,1)
+        self.grid1.addWidget(self.analyze_blu,1,0)
+
+        self.grid1.addWidget(self.setBluFocus,2,0)
+        self.grid1.addWidget(self.setRedFocus,2,1)
+
         # add a "quit" button
         self.qbtn = QPushButton("Done and Quit")
         self.qbtn.setStyleSheet("background-color: %s" % self.doneColor)
@@ -211,20 +235,17 @@ class MyWindow(QWidget):
         self.vlayout1 = QVBoxLayout()
         self.vlayout1.addLayout(self.grid)
         self.vlayout1.addStretch(1)
+        self.vlayout1.addWidget(self.tdaConfig)
         self.vlayout1.addWidget(self.lampsOn)
-        self.vlayout1.addWidget(self.expose_red)
-        self.vlayout1.addWidget(self.expose_blu)
-        self.vlayout1.addWidget(self.analyze_red)
-        self.vlayout1.addWidget(self.analyze_blu)
+        self.vlayout1.addLayout(self.grid1)
         self.vlayout1.addWidget(self.lampsOff)
-        self.vlayout1.addWidget(self.setBluFocus)
-        self.vlayout1.addWidget(self.setRedFocus)
         self.setBluFocus.setEnabled(False)
         self.setRedFocus.setEnabled(False)
+
         self.vlayout1.addWidget(self.qbtn)
         self.vlayout1.addWidget(self.output)
 
-        self.figure = plt.figure(figsize=(5, 5))
+        self.figure = plt.figure(figsize=(4, 4))
         self.canvas = FigureCanvas(self.figure)
         self.layout = QHBoxLayout()
         self.layout.addLayout(self.vlayout1)
@@ -393,6 +414,43 @@ class MyWindow(QWidget):
             output_callback.emit("\nLamps are on. \n Please wait 3 minutes for blue lamps to warm up.\n")
         else:
             output_callback.emit("\n KTL is NOT ENABLED")
+
+
+    def run_tdaConfig(self):
+        """
+        Set default TDA/ToO configuration
+        """
+        worker = Worker(self.tdaConfig)
+        worker.signals.started.connect(lambda: self.tdaConfig.setEnabled(False))
+        worker.signals.result.connect(self.showOutput)
+        worker.signals.output.connect(self.showOutput)
+        worker.signals.finished.connect(lambda: self.tdaConfig.setEnabled(True))
+        self.threadpool.start(worker)
+
+    def tdaConfig(self, output_callback):
+        if useKTL:
+            output_callback.emit('\nSetting TDA/ToO Configuration\n')
+            lris = ktl.cache('lris')
+            lrisblu = ktl.cache('lrisblue')
+            output_callback.emit("Setting slit to long_1.0")
+            lris['slitname'].write('long_1.0')
+            output_callback.emit("Setting dichroic to D560")
+            lris['dichname'].write('560')
+            output_callback.emit("Setting grating to 600/5000")
+            lris['graname'].write('400/8500')
+            output_callmback.emit("Homing grating")
+            lris['home'].write(3)
+            output_callback.emit("Setting wavelength to 7830")
+            lris['wavelen'].write(7830)
+            output_callback.emit("Setting red filter to clear")
+            lris['redfilt'].write("Clear")
+            output_callback.emit("Setting grism to 600/4000")
+            lris['grisname'].write('400/3400')
+            output_callback.emit("Setting blue filter to clear")
+            lris['blufilt'].write("Clear")
+            output_callback.emit("Please reset the blue and red ccd to default values")
+
+
 
     def run_turnOffLamps(self):
         worker = Worker(self.turnOffLamps)
@@ -565,7 +623,7 @@ class MyWindow(QWidget):
             #print("Acquiring %s image at focus value %f\n" % (side,focus))
 
             #self.showOutput("Acquiring %s image at focus value %f\n" % (side,focus))
-            output_callback.emit("Image %d of %d: %s image at focus value %f\n" % (step+1, number_of_steps,side,focus))
+            output_callback.emit("[%s] Image %d of %d: %s image at focus value %f\n" % (side.upper(), step+1, number_of_steps,side,focus))
             if side == 'red':
                 self.goir()
             elif side == 'blue':
