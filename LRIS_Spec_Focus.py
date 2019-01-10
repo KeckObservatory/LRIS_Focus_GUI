@@ -4,6 +4,7 @@ import subprocess
 import sys
 import time
 import traceback
+import logging
 
 try:
     import ktl
@@ -23,8 +24,48 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 # this imports the module written by S. Kwok.
 import SpecFocus
 
+class Log():
+    def __init__(self):
+        self.formatter = logging.Formatter('%(asctime)s - %(module)12s.%(funcName)20s - %(levelname)s: %(message)s')
+        # set up logging to STDOUT for all levels DEBUG and higher
+        self.mylogger = logging.getLogger('MyLogger')
+        self.mylogger.setLevel(logging.DEBUG)
+        # create shortcut functions
+        self.debug = self.mylogger.debug
+        self.info = self.mylogger.info
+        self.warning = self.mylogger.warning
+        self.error = self.mylogger.error
+        self.critical = self.mylogger.critical
+
+    def setStdout(self):
+        self.sh = logging.StreamHandler(sys.stdout)
+        self.sh.setLevel(logging.INFO)
+        self.sh.setFormatter(self.formatter)
+        self.mylogger.addHandler(self.sh)    # enabled: stdout
+
+    def setFile(self, filename):
+        # set up logging to a file for all levels DEBUG and higher
+        self.fh = logging.FileHandler(filename)
+        self.fh.setLevel(logging.DEBUG)
+        self.fh.setFormatter(self.formatter)
+        self.mylogger.addHandler(self.fh)    # enabled: file
+        # Add log entries for versions of numpy, matplotlib, astropy, ccdproc
+        self.info(sys.version)
+        self.info('python version = {}.{}.{}'.format(sys.version_info.major,
+                                        sys.version_info.minor,
+                                        sys.version_info.micro))
+
+
+# setup logging
+Day = time.strftime("%m-%d-%Y", time.localtime())
+Time = time.strftime("%I:%M:%S-%p", time.localtime())
+log_file_name = 'LRIS_Spec_Focus_%s_%s.log' % (Day, Time)
+log = Log()
+log.setFile(log_file_name)
 
 def main():
+
+
     app = QApplication(sys.argv)
     w = MyWindow()
     w.show()
@@ -255,6 +296,7 @@ class MyWindow(QWidget):
 
     def setFocus(self):
         sender =  self.sender().text()
+        log.info("Sender is %s" % sender)
         if sender == 'Set blue camera focus':
             lris = ktl.cache('lris')
             lris['blufocus'].write(self.bestBluFocus)
@@ -270,6 +312,7 @@ class MyWindow(QWidget):
         """
         Closes the GUI and quit
         """
+        log.info("Quit button pressed. All done.")
         self.close()
 
     def dataReady(self):
@@ -291,6 +334,7 @@ class MyWindow(QWidget):
         cursor.movePosition(cursor.End)
         cursor.insertText(text)
         self.output.ensureCursorVisible()
+        log.info(text)
 
     def plot(self):
         """
@@ -386,6 +430,7 @@ class MyWindow(QWidget):
         """
         Turn on the calibration lamps
         """
+        self.log("Turn on lamps requested")
         worker = Worker(self.turnOnLamps)
         worker.signals.started.connect(lambda: self.lampsOn.setEnabled(False))
         worker.signals.result.connect(self.showOutput)
@@ -420,6 +465,7 @@ class MyWindow(QWidget):
         """
         Set default TDA/ToO configuration
         """
+        self.log("TDA configuration requested")
         worker = Worker(self.tdaConfig)
         worker.signals.started.connect(lambda: self.tdaConfig.setEnabled(False))
         worker.signals.result.connect(self.showOutput)
@@ -453,6 +499,7 @@ class MyWindow(QWidget):
 
 
     def run_turnOffLamps(self):
+        log.info("Turn off lamps requested")
         worker = Worker(self.turnOffLamps)
         worker.signals.started.connect(lambda: self.lampsOff.setEnabled(False))
         worker.signals.result.connect(self.showOutput)
@@ -484,6 +531,7 @@ class MyWindow(QWidget):
         """
         Save original parameters for red side
         """
+        log.info("Running saveRedState")
         if useKTL:
             self.originalPrefixRed = self.lris['outfile'].read()
             self.binningx_red,self.binningy_red = self.lris['binning'].read(binary=True)
@@ -493,6 +541,7 @@ class MyWindow(QWidget):
         """
         Save original parameters for blue side
         """
+        log.info("Running saveBlueState")
         if useKTL:
             self.originalPrefixBlu = self.lrisblue['outfile'].read()
             self.binningx_blu,self.binningy_blu = self.lris['binning'].read(binary=True)
@@ -501,6 +550,7 @@ class MyWindow(QWidget):
         """
         Run when the red side images have been taken, to restore binning, ccdspeed, and original file names
         """
+        log.info("Running redSideDone")
         self.expose_red.setEnabled(True)
         self.showOutput("Red side focus images complete\n")
         if useKTL:
@@ -512,6 +562,7 @@ class MyWindow(QWidget):
         """
         Run when the blue side images have been taken, to restore binning, ccdspeed, and original file names
         """
+        log.info("Running blueSideDone")
         self.expose_blu.setEnabled(True)
         self.showOutput("Blue side focus images complete\n")
         if useKTL:
@@ -529,6 +580,7 @@ class MyWindow(QWidget):
         """
         Using an ssh to lrisserver (which might not be needed), run the focus loop
         """
+        log.info("Button Takeredimages pressed")
         self.saveRedState()
         if useKTL:
             self.lris['outfile'].write('rfoc_')
@@ -555,6 +607,7 @@ class MyWindow(QWidget):
         """
         Using an ssh to lrisserver (which might not be needed), run the focus loop
         """
+        log.info("Button Takeblueimages pressed")
         self.saveBluState()
         if useKTL:
             self.lrisblue['outfile'].write('bfoc_')
@@ -583,7 +636,7 @@ class MyWindow(QWidget):
         #self.bluimages.start('focusloop', ['blue', startingPoint, number, step])
 
     def setLrisFocus(self,side, value, output_callback):
-
+        log.info("Setting LRIS focus")
         if useKTL is False:
             output_callback.emit("KTL not available, not setting focus\n")
             return
@@ -615,9 +668,11 @@ class MyWindow(QWidget):
             return
 
         # backlash correction
+        log.info("Applying anti-backlash correction to %s side" % side)
         self.setLrisFocus(side, startingPoint + backlash_correction[side], output_callback)
 
-        for step in range(0,number_of_steps-1):
+        log.info("Starting focus sequence on %s side" % side)
+        for step in range(number_of_steps):
             focus = startingPoint + step * increment
             self.setLrisFocus(side, focus, output_callback)
             #print("Acquiring %s image at focus value %f\n" % (side,focus))
@@ -631,6 +686,7 @@ class MyWindow(QWidget):
 
 
     def goib(self):
+        log.info("Running goib")
         if useKTL is False:
             time.sleep(1)
             return
@@ -660,6 +716,7 @@ class MyWindow(QWidget):
         rserv.waitFor('==False', timeout = 200)
 
     def goir(self):
+        log.info("Running goir")
         if useKTL is False:
             time.sleep(1)
             return
