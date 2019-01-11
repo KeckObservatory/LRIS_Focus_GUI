@@ -430,7 +430,7 @@ class MyWindow(QWidget):
         """
         Turn on the calibration lamps
         """
-        self.log("Turn on lamps requested")
+        log.info("Turn on lamps requested")
         worker = Worker(self.turnOnLamps)
         worker.signals.started.connect(lambda: self.lampsOn.setEnabled(False))
         worker.signals.result.connect(self.showOutput)
@@ -465,36 +465,36 @@ class MyWindow(QWidget):
         """
         Set default TDA/ToO configuration
         """
-        self.log("TDA configuration requested")
-        worker = Worker(self.tdaConfig)
+        log.info("TDA configuration requested")
+        worker = Worker(self.tdaConfig_call)
         worker.signals.started.connect(lambda: self.tdaConfig.setEnabled(False))
         worker.signals.result.connect(self.showOutput)
         worker.signals.output.connect(self.showOutput)
         worker.signals.finished.connect(lambda: self.tdaConfig.setEnabled(True))
         self.threadpool.start(worker)
 
-    def tdaConfig(self, output_callback):
+    def tdaConfig_call(self, output_callback):
         if useKTL:
             output_callback.emit('\nSetting TDA/ToO Configuration\n')
             lris = ktl.cache('lris')
             lrisblu = ktl.cache('lrisblue')
-            output_callback.emit("Setting slit to long_1.0")
+            output_callback.emit("Setting slit to long_1.0\n")
             lris['slitname'].write('long_1.0')
-            output_callback.emit("Setting dichroic to D560")
+            output_callback.emit("Setting dichroic to D560\n")
             lris['dichname'].write('560')
-            output_callback.emit("Setting grating to 600/5000")
+            output_callback.emit("Setting grating to 600/5000\n")
             lris['graname'].write('400/8500')
-            output_callmback.emit("Homing grating")
+            output_callback.emit("Homing grating\n")
             lris['home'].write(3)
-            output_callback.emit("Setting wavelength to 7830")
+            output_callback.emit("Setting wavelength to 7830\n")
             lris['wavelen'].write(7830)
-            output_callback.emit("Setting red filter to clear")
+            output_callback.emit("Setting red filter to clear\n")
             lris['redfilt'].write("Clear")
-            output_callback.emit("Setting grism to 600/4000")
+            output_callback.emit("Setting grism to 400/3400\n")
             lris['grisname'].write('400/3400')
-            output_callback.emit("Setting blue filter to clear")
-            lris['blufilt'].write("Clear")
-            output_callback.emit("Please reset the blue and red ccd to default values")
+            output_callback.emit("Setting blue filter to clear\n")
+            lris['blufilt'].write("clear")
+            output_callback.emit("Please reset the blue and red ccd to default values\n")
 
 
 
@@ -651,7 +651,7 @@ class MyWindow(QWidget):
         else:
             return
         keyword.write(value)
-        output_callback.emit("\n%s focus set to %s\n" % (side, str(value)))
+        output_callback.emit("\n[%s] focus set to %s\n" % (side, str(value)))
 
     def focusloop(self, side, startingPoint, number_of_steps, increment, output_callback):
 
@@ -692,6 +692,7 @@ class MyWindow(QWidget):
             return
         # create and monitor keywords
         lrisb = ktl.cache('lrisblue')
+        autoshut = lrisb['autoshut']
         exposip = lrisb['exposip']
         wcrate = lrisb['wcrate']
         rserv = lrisb['rserv']
@@ -701,6 +702,9 @@ class MyWindow(QWidget):
         keywords = [exposip, wcrate, rserv, ttime]
         for key in keywords:
             key.monitor()
+
+        # reset autoshut to True
+        autoshut.write(True)
 
         # make sure no other exposure is in progress
         exposip.waitFor('==False')
@@ -722,6 +726,7 @@ class MyWindow(QWidget):
             return
         # create and monitor keywords
         lris = ktl.cache('lris')
+        autoshut = lris['autoshut']
         observip = lris['observip']
         #exposip = lrib['exposip']
         wcrate = lris['wcrate']
@@ -732,6 +737,9 @@ class MyWindow(QWidget):
         keywords = [observip, wcrate]
         for key in keywords:
             key.monitor()
+
+        # reset autoshut to True
+        autoshut.write(True)
 
         # make sure no other exposure is in progress
         observip.waitFor('==False')
