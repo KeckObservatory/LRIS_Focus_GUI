@@ -482,7 +482,7 @@ class MyWindow(QWidget):
             lris['slitname'].write('long_1.0')
             output_callback.emit("Setting dichroic to D560\n")
             lris['dichname'].write('560')
-            output_callback.emit("Setting grating to 600/5000\n")
+            output_callback.emit("Setting grating to 400/8500\n")
             lris['graname'].write('400/8500')
             output_callback.emit("Homing grating\n")
             lris['home'].write(3)
