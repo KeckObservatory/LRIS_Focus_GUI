@@ -1,6 +1,6 @@
 import astropy.io.fits as pyfits
 import numpy as np
-
+import re
 
 class MosaicFitsReader:
     def __init__(self, fname=None):
@@ -25,46 +25,97 @@ class MosaicFitsReader:
     def read (self, fname):
         """
         Reads image data from a DEIMOS fits file.
-        Returns the raw image data and locations of the regions and the minmax.
+        Returns the raw image data.
         """
-        info = []
-        img = []
-        minx, maxx, miny, maxy = 1E9, 0, 1E9, 0
-        with pyfits.open(fname) as hdrs:
-            self.hdrs = hdrs
-            for h in hdrs:
-                header = h.header
-                try:
-                    dstr = header.get('DETSIZE')
-                    if not dstr:
-                        # Primary HDU has no DETSIZE
-                        continue
+        
+        #open
+        hdus = pyfits.open(fname, ignore_missing_end=True)
+        #needed hdr vals
+        hdr0 = hdus[0].header
+        binning  = hdr0['BINNING'].split(',')
+        precol   = int(hdr0['PRECOL'])   // int(binning[0])
+        postpix  = int(hdr0['POSTPIX'])  // int(binning[0])
+        preline  = int(hdr0['PRELINE'])  // int(binning[1])
+        postline = int(hdr0['POSTLINE']) // int(binning[1])
 
-                    detSize = self._splitFormat(dstr)
-                    if len(img) == 0:
-                        img = np.zeros((detSize[3],detSize[1]))
+        #get extension order (uses DETSEC keyword)
+        ext_order = self.get_ext_data_order(hdus)
+        assert ext_order, "ERROR: Could not determine extended data order"
 
-                    srcReg = self._getRegion(self._splitFormat(header.get('DATASEC')))
-                    dstReg = self._getRegion(self._splitFormat(header.get('DETSEC')))
+        #loop thru extended headers in order, create png and add to list in order
+        vmin = None
+        vmax = None
+        alldata = None
+        for i, ext in enumerate(ext_order):
+            data = hdus[ext].data
+            hdr  = hdus[ext].header
 
-                    regMinx, regMaxx, regMiny, regMaxy = min(dstReg[0].start, dstReg[0].stop), \
-                        max(dstReg[0].start, dstReg[0].stop), \
-                        min(dstReg[1].start, dstReg[1].stop), \
-                        max(dstReg[1].start, dstReg[1].stop)
+            #calc bias array from postpix area
+            sh = data.shape
+            x1 = 0
+            x2 = sh[0]
+            y1 = sh[1] - postpix + 1
+            y2 = sh[1] - 1
+            bias = np.median(data[x1:x2, y1:y2], axis=1)
+            bias = np.array(bias, dtype=np.int64)
 
-                    minx = min(minx, regMinx)
-                    maxx = max(maxx, regMaxx)
-                    miny = min(miny, regMiny)
-                    maxy = max(maxy, regMaxy)
+            #subtract bias
+            data = data - bias[:,None]
 
-                    img[dstReg[1],dstReg[0]] = h.data[srcReg[1], srcReg[0]]
-                    info.append((regMinx, regMaxx, regMiny, regMaxy))
-                except Exception as e:
-                    print ("While reading", fname, e)
-                    return None
-            self.minmax = minx,maxx,miny,maxx
-            self.info = info
-            return img
+            #get min max of each ext (not including pre/post pixels)
+            #NOTE: using sample box that is 90% of full area
+            #todo: should we take an average min/max of each ext for balancing?
+            sh = data.shape
+            x1 = int(preline          + (sh[0] * 0.10))
+            x2 = int(sh[0] - postline - (sh[0] * 0.10))
+            y1 = int(precol           + (sh[1] * 0.10))
+            y2 = int(sh[1] - postpix  - (sh[1] * 0.10))
+
+            #remove pre/post pix columns
+            data = data[:,precol:data.shape[1]-postpix]
+
+            #flip data left/right 
+            #NOTE: This should come after removing pre/post pixels
+            ds = self.get_detsec_data(hdr['DETSEC'])
+            if ds and ds[0] > ds[1]: 
+                data = np.fliplr(data)
+            if ds and ds[2] > ds[3]: 
+                data = np.flipud(data)
+
+            #concatenate horizontally
+            if i==0: alldata = data
+            else   : alldata = np.append(alldata, data, axis=1)
+            return alldata
+        
+    def get_ext_data_order(self,hdus):
+        '''
+        Use DETSEC keyword to figure out true order of extension data for horizontal tiling
+        '''
+        key_orders = {}
+        for i in range(1, len(hdus)):
+            ds = self.get_detsec_data(hdus[i].header['DETSEC'])
+            if not ds: return None
+            key_orders[ds[0]] = i
+
+        orders = []
+        for key in sorted(key_orders):
+            orders.append(key_orders[key])
+        return orders
+
+
+    def get_detsec_data(self,detsec):
+        '''
+        Parse DETSEC string for x1, x2, y1, y2
+        '''
+        match = re.search( r'(\d+):(\d+),(\d+):(\d+)', detsec)
+        if not match:
+            return None
+        else:
+            x1 = int(match.groups(1)[0])
+            x2 = int(match.groups(1)[1])
+            y1 = int(match.groups(1)[2])
+            y2 = int(match.groups(1)[3])
+            return [x1, x2, y1, y2]
 
     def readCut (self, fname):
         img = self.read(fname)
@@ -80,4 +131,6 @@ class MosaicFitsReader:
                 continue
         return None
             
+
+
         
