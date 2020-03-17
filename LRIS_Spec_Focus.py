@@ -66,10 +66,10 @@ log.setFile(log_file_name)
 
 # set this variable to LOCAL if you are using test images on the current directory
 # Any other value will use outdir and the keywords
-run_mode = 'LOCAL'
+run_mode = None #'LOCAL'
 # if you specify a data directory and run_mode is LOCAL, the program will look for files in the data_directory instead
 # of the current directory
-data_directory = '/Users/lrizzi/LRIS_FOCUS_DATA'
+# data_directory = '/Users/lrizzi/LRIS_FOCUS_DATA'
 
 
 
@@ -596,7 +596,7 @@ class MyWindow(QWidget):
             self.lrisblue['window'].write([1,0,0,2048,4096])
             self.lrisblue['prepix'].write(51)
             self.lrisblue['postpix'].write(80)
-            self.lrisblue['binning'].write([self.binningx_blu,self.binningy_blu])
+            #self.lrisblue['binning'].write([self.binningx_blu,self.binningy_blu])
 
     def takeRedImages(self):
         """
