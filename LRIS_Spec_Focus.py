@@ -24,6 +24,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 # this imports the module written by S. Kwok.
 import SpecFocus
 
+
 class Log():
     def __init__(self):
         self.formatter = logging.Formatter('%(asctime)s - %(module)12s.%(funcName)20s - %(levelname)s: %(message)s')
@@ -62,6 +63,15 @@ Time = time.strftime("%I:%M:%S-%p", time.localtime())
 log_file_name = 'LRIS_Spec_Focus_%s_%s.log' % (Day, Time)
 log = Log()
 log.setFile(log_file_name)
+
+# set this variable to LOCAL if you are using test images on the current directory
+# Any other value will use outdir and the keywords
+run_mode = 'LOCAL'
+# if you specify a data directory and run_mode is LOCAL, the program will look for files in the data_directory instead
+# of the current directory
+data_directory = '/Users/lrizzi/LRIS_FOCUS_DATA'
+
+
 
 def main():
 
@@ -402,8 +412,20 @@ class MyWindow(QWidget):
             prefix = 'bfoc*.fits'
             numberToAnalyze = int(self.number_blu.text())
 
+
         # location of the output images
         directory = '/s'+self.lris['outdir'].read()
+
+        if run_mode != 'LOCAL':
+            output, errors = self.run_command('ssh lriseng@lrisserver outdir')
+            directory = str(output.decode()).replace('\n', '')
+        else:
+            if data_directory:
+                directory = data_directory
+            else:
+                directory = os.getcwd()
+
+
 
         self.files = glob.glob(os.path.join(directory, prefix))
         self.files.sort(key=os.path.getmtime)

@@ -148,10 +148,14 @@ def measureWidths(files):
             Focus = ffile.getKeyword('REDFOCUS')
         if Focus == None:
             continue
+        print("Shape of the array: %d x %d" % (img.shape[0], img.shape[1]))
+        print("Setting maxrow to %d" % (img.shape[0]-200))
+        maxrow = img.shape[1]-200
         for row in range(minrow,maxrow,100):
             cut1d = img[:,row]
-            if np.max(gaussian_filter(cut1d,sigma=20))> 2000:
-                widths = np.array(findWidths(cut1d))
+            if np.max(gaussian_filter(cut1d,sigma=20))> 0:
+                length = cut1d.shape[0]/60
+                widths = np.array(findWidths(cut1d, size=int(length)))
                 if len(widths)>5:
                     #clippedWidths,low,upp = stats.sigmaclip(widths,low=4,high=2)
                     clippedWidths = absoluteClip(widths, high=1)
