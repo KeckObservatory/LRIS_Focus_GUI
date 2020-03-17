@@ -29,8 +29,10 @@ class MosaicFitsReader:
         """
         
         #open
+        print("reading...")
         hdus = pyfits.open(fname, ignore_missing_end=True)
         #needed hdr vals
+        self.hdrs = hdus
         hdr0 = hdus[0].header
         binning  = hdr0['BINNING'].split(',')
         precol   = int(hdr0['PRECOL'])   // int(binning[0])
@@ -85,7 +87,7 @@ class MosaicFitsReader:
             #concatenate horizontally
             if i==0: alldata = data
             else   : alldata = np.append(alldata, data, axis=1)
-            return alldata
+        return alldata
         
     def get_ext_data_order(self,hdus):
         '''

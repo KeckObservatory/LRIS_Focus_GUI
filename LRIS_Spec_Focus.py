@@ -14,6 +14,13 @@ from matplotlib.figure import Figure
 
 import SpecFocus
 
+# set this variable to LOCAL if you are using test images on the current directory
+# Any other value will use outdir and the keywords
+run_mode = 'LOCAL'
+# if you specify a data directory and run_mode is LOCAL, the program will look for files in the data_directory instead
+# of the current directory
+data_directory = '/Users/lrizzi/LRIS_FOCUS_DATA'
+
 
 def main():
     app = QApplication(sys.argv)
@@ -199,8 +206,15 @@ class MyWindow(QWidget):
             prefix = 'bfoc*.fits'
             numberToAnalyze = int(self.number_blu.text())
 
-        output, errors = self.run_command('ssh lriseng@lrisserver outdir')
-        directory = str(output.decode()).replace('\n', '')
+        if run_mode != 'LOCAL':
+            output, errors = self.run_command('ssh lriseng@lrisserver outdir')
+            directory = str(output.decode()).replace('\n', '')
+        else:
+            if data_directory:
+                directory = data_directory
+            else:
+                directory = os.getcwd()
+
 
         self.files = glob.glob(os.path.join(directory, prefix))
         self.files.sort(key=os.path.getmtime)
