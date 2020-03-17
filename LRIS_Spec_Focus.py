@@ -18,7 +18,7 @@ import numpy as np
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import QLabel, QHBoxLayout, QLineEdit, QPushButton, QVBoxLayout, QApplication, QWidget, QTextEdit, \
-    QGridLayout
+    QGridLayout, QCheckBox
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 
 # this imports the module written by S. Kwok.
@@ -237,6 +237,8 @@ class MyWindow(QWidget):
         
         self.grid1 = QGridLayout()
 
+        self.red_side_current_settings = QCheckBox("Preserve current RED side CCD settings?")
+        self.red_side_current_settings.setCheckState(Qt.Unchecked)
         self.expose_red = QPushButton("Take red focus images")
         self.expose_red.setStyleSheet("background-color: %s" % self.redColor)
         self.expose_red.clicked.connect(self.takeRedImages)
@@ -288,6 +290,7 @@ class MyWindow(QWidget):
         self.vlayout1.addStretch(1)
         self.vlayout1.addWidget(self.tdaConfig)
         self.vlayout1.addWidget(self.lampsOn)
+        self.vlayout1.addWidget(self.red_side_current_settings)
         self.vlayout1.addLayout(self.grid1)
         self.vlayout1.addWidget(self.lampsOff)
         self.setBluFocus.setEnabled(False)
@@ -413,12 +416,9 @@ class MyWindow(QWidget):
             numberToAnalyze = int(self.number_blu.text())
 
 
-        # location of the output images
-        directory = '/s'+self.lris['outdir'].read()
 
         if run_mode != 'LOCAL':
-            output, errors = self.run_command('ssh lriseng@lrisserver outdir')
-            directory = str(output.decode()).replace('\n', '')
+            directory = '/s' + self.lris['outdir'].read()
         else:
             if data_directory:
                 directory = data_directory
@@ -606,8 +606,11 @@ class MyWindow(QWidget):
         self.saveRedState()
         if useKTL:
             self.lris['outfile'].write('rfoc_')
-            self.lris['binning'].write([1,1])
-            self.lris['pane'].write([0,0,4096,4096])
+            if self.red_side_current_settings.isChecked():
+                self.showOutput("Preserving settings for the red side")
+            else:
+                self.lris['binning'].write([1,1])
+                self.lris['pane'].write([0,0,4096,4096])
             self.lris['ttime'].write(1)
             self.lris['ccdspeed'].write('fast')
             self.lris['object'].write('Focus loop')
@@ -673,7 +676,7 @@ class MyWindow(QWidget):
         else:
             return
         keyword.write(value)
-        output_callback.emit("\n[%s] focus set to %s\n" % (side, str(value)))
+        output_callback.emit("\n[%s] focus set to %s\n" % (side.upper(), str(value)))
 
     def focusloop(self, side, startingPoint, number_of_steps, increment, output_callback):
 
