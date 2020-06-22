@@ -416,6 +416,8 @@ class MyWindow(QWidget):
             numberToAnalyze = int(self.number_blu.text())
 
 
+        #run_mode = 'LOCAL'
+        #data_directory = '/Users/lrizzi/LRIS_FOCUS_DATA'
 
         if run_mode != 'LOCAL':
             directory = '/s' + self.lris['outdir'].read()
