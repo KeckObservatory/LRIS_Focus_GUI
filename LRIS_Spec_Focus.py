@@ -66,10 +66,10 @@ log.setFile(log_file_name)
 
 # set this variable to LOCAL if you are using test images on the current directory
 # Any other value will use outdir and the keywords
-run_mode = None #'LOCAL'
+run_mode = 'LOCAL' #'LOCAL'
 # if you specify a data directory and run_mode is LOCAL, the program will look for files in the data_directory instead
 # of the current directory
-# data_directory = '/Users/lrizzi/LRIS_FOCUS_DATA'
+data_directory = '/Users/lrizzi/Python_Projects/data'
 
 
 
@@ -171,6 +171,7 @@ class MyWindow(QWidget):
         if useKTL:
             self.lris = ktl.cache('lris')
             self.lrisblue = ktl.cache('lrisblue')
+            self.lredccd = ktl.cache('lredccd')
         # call to the main routine to create the interface
         self.threadpool = QThreadPool()
         print("Multithreading with maximum %d threads" % self.threadpool.maxThreadCount())
@@ -420,7 +421,7 @@ class MyWindow(QWidget):
         #data_directory = '/Users/lrizzi/LRIS_FOCUS_DATA'
 
         if run_mode != 'LOCAL':
-            directory = '/s' + self.lris['outdir'].read()
+            directory = '/s' + self.lredccd['outdir'].read()
         else:
             if data_directory:
                 directory = data_directory
@@ -557,8 +558,8 @@ class MyWindow(QWidget):
         """
         log.info("Running saveRedState")
         if useKTL:
-            self.originalPrefixRed = self.lris['outfile'].read()
-            self.binningx_red,self.binningy_red = self.lris['binning'].read(binary=True)
+            self.originalPrefixRed = self.lredccd['outfile'].read()
+
 
 
     def saveBluState(self):
@@ -578,9 +579,7 @@ class MyWindow(QWidget):
         self.expose_red.setEnabled(True)
         self.showOutput("Red side focus images complete\n")
         if useKTL:
-            self.lris['outfile'].write(self.originalPrefixRed)
-            self.lris['ccdspeed'].write('normal')
-            self.lris['binning'].write([self.binningx_red,self.binningy_red])
+            self.lredccd['outfile'].write(self.originalPrefixRed)
 
     def bluSideDone(self):
         """
@@ -607,15 +606,9 @@ class MyWindow(QWidget):
         log.info("Button Takeredimages pressed")
         self.saveRedState()
         if useKTL:
-            self.lris['outfile'].write('rfoc_')
-            if self.red_side_current_settings.isChecked():
-                self.showOutput("Preserving settings for the red side")
-            else:
-                self.lris['binning'].write([1,1])
-                self.lris['pane'].write([0,0,4096,4096])
-            self.lris['ttime'].write(1)
-            self.lris['ccdspeed'].write('fast')
-            self.lris['object'].write('Focus loop')
+            self.lredccd['outfile'].write('rfoc_')
+            self.lredccd['ttime'].write(1)
+            self.lredccd['object'].write('Focus loop')
 
         center = float(self.center_red.text())
         step = float(self.step_red.text())
@@ -646,7 +639,7 @@ class MyWindow(QWidget):
             self.lrisblue['prepix'].write(51)
             self.lrisblue['postpix'].write(80)
             self.lrisblue['ttime'].write(1)
-            self.lris['object'].write('Focus loop')
+            self.lredccd['object'].write('Focus loop')
 
         center = float(self.center_blu.text())
         step = int(self.step_blu.text())
@@ -751,32 +744,7 @@ class MyWindow(QWidget):
         if useKTL is False:
             time.sleep(1)
             return
-        # create and monitor keywords
-        lris = ktl.cache('lris')
-        autoshut = lris['autoshut']
-        observip = lris['observip']
-        #exposip = lrib['exposip']
-        wcrate = lris['wcrate']
-        #rserv = lrisb['rserv']
-        #object = lrib['object']
-        #ttime = lrisb['ttime']
-        expose = lris['expose']
-        keywords = [observip, wcrate]
-        for key in keywords:
-            key.monitor()
-
-        # reset autoshut to True
-        autoshut.write(True)
-
-        # make sure no other exposure is in progress
-        observip.waitFor('==False')
-
-        # start the exposure
-        expose.write(True, wait=True)
-
-        # wait for end of exposure
-        wcrate.waitFor('==True')
-        observip.waitFor('==False', timeout = 200)
+        self.run_command('goir')
 
 
     def run_command(self, command):
@@ -786,7 +754,7 @@ class MyWindow(QWidget):
         @param return: Return code
         """
         cmdline = command
-        if self.runMode is 'debug':
+        if self.runMode == 'debug':
             self.output.setText('Simulation mode\n Running:\n %s' % (cmdline))
             return '', ''
         try:
