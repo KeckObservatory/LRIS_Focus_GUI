@@ -105,7 +105,9 @@ def calcAsymptote(A, B, C):
     h = -B/A/2
     a2 = C - A * h*h
     b2 = a2/A
-    m0 = math.sqrt(a2/b2)
+    print("a: ", a2)
+    print("b: ", b2)
+    m0 = math.sqrt(abs(a2/b2))
     b0 = -m0 * h
     return m0, b0, h
 
@@ -142,10 +144,13 @@ def measureWidths(files):
         ffile = mfr.MosaicFitsReader(fname)
         img = np.array(ffile.data)
         instrument = ffile.getKeyword('INSTRUME')
+        if instrument is None:
+                instrument = 'RED'
         if "BLU" in instrument:
             Focus = ffile.getKeyword('BLUFOCUS')
         else:
             Focus = ffile.getKeyword('REDFOCUS')
+            #img = np.rot90(img)
         if Focus == None:
             continue
         print("Shape of the array: %d x %d" % (img.shape[0], img.shape[1]))
@@ -156,12 +161,14 @@ def measureWidths(files):
             if np.max(gaussian_filter(cut1d,sigma=20))> 0:
                 length = cut1d.shape[0]/60
                 widths = np.array(findWidths(cut1d, size=int(length)))
+                print("lines found:", len(widths))
                 if len(widths)>5:
                     #clippedWidths,low,upp = stats.sigmaclip(widths,low=4,high=2)
                     clippedWidths = absoluteClip(widths, high=1)
                     if clippedWidths.std()<1 and np.median(clippedWidths)<5:
-                        #print(row,Focus,clippedWidths.mean(),low,upp,clippedWidths.std())
+                        #print("DIAGNOSTICS:", row,Focus,clippedWidths.mean(),low,upp,clippedWidths.std())
                         out.append((Focus, clippedWidths))
+                    out.append((Focus, widths))
     return out
 
 
@@ -196,6 +203,8 @@ def fitPairs(pairs):
     Finds the parameters for the asymptotes 
     """
     A, B, C = res
+
+    print("ABC:",A,B,C)
     m0, b0, minX = calcAsymptote(A, B, C)
     print ("minX", minX, "Asymp", m0, b0)
 

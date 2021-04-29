@@ -13,6 +13,9 @@ except:
     print("KTL functions are not available")
     useKTL = False
 
+import matplotlib
+matplotlib.use("Qt5Agg")
+
 import matplotlib.pyplot as plt
 import numpy as np
 from PyQt5.QtCore import *
@@ -66,10 +69,10 @@ log.setFile(log_file_name)
 
 # set this variable to LOCAL if you are using test images on the current directory
 # Any other value will use outdir and the keywords
-run_mode = 'LOCAL' #'LOCAL'
+run_mode = '' #'LOCAL'
 # if you specify a data directory and run_mode is LOCAL, the program will look for files in the data_directory instead
 # of the current directory
-data_directory = '/Users/lrizzi/Python_Projects/data'
+#data_directory = '/Users/lrizzi/Python_Projects/LRIS_Focus_GUI/data'
 
 
 
@@ -219,6 +222,7 @@ class MyWindow(QWidget):
         self.step_blu.setText("90")
         self.number_blu = QLineEdit()
         self.number_blu.setText("7")
+
 
         # grid arrangement for the default values for the focus loop
         self.grid = QGridLayout()

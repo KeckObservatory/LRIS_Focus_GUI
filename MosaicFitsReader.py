@@ -29,11 +29,13 @@ class MosaicFitsReader:
         """
         
         #open
-        print("reading...")
+        print("reading...", fname)
         hdus = pyfits.open(fname, ignore_missing_end=True)
         #needed hdr vals
         self.hdrs = hdus
         hdr0 = hdus[0].header
+        if len(hdus) == 2:
+                return hdus[0].data
         binning  = hdr0['BINNING'].split(',')
         precol   = int(hdr0['PRECOL'])   // int(binning[0])
         postpix  = int(hdr0['POSTPIX'])  // int(binning[0])
