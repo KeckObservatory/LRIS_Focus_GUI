@@ -573,7 +573,7 @@ class MyWindow(QWidget):
         log.info("Running saveBlueState")
         if useKTL:
             self.originalPrefixBlu = self.lrisblue['outfile'].read()
-            self.binningx_blu,self.binningy_blu = self.lris['binning'].read(binary=True)
+            self.binningx_blu,self.binningy_blu = self.lrisblue['binning'].read(binary=True)
 
     def redSideDone(self):
         """
